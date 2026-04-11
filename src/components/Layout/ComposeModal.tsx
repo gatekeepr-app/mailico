@@ -1,4 +1,10 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import ComposeForm from './ComposeForm'
 
 export default function ComposeModal({
@@ -10,8 +16,14 @@ export default function ComposeModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-[90%] rounded-xl p-0 max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="overflow-y-auto p-0">
+      <DialogContent className='flex max-h-[90vh] w-[90%] max-w-xl flex-col overflow-hidden rounded-xl p-0'>
+        <DialogHeader className='border-b border-slate-200 px-4 py-3 text-left dark:border-white/10'>
+          <DialogTitle>Compose message</DialogTitle>
+          <DialogDescription>
+            Draft and send a new email from your Mailico workspace.
+          </DialogDescription>
+        </DialogHeader>
+        <div className='overflow-y-auto p-0'>
           <ComposeForm onSent={() => onOpenChange(false)} />
         </div>
       </DialogContent>

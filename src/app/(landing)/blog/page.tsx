@@ -1,5 +1,3 @@
-// app/blog/page.tsx
-import Footer from '@/components/Layout/Footer'
 import { getAllPosts } from '@/lib/blogs'
 import Link from 'next/link'
 

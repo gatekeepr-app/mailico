@@ -1,34 +1,45 @@
 'use client'
 
-import { Mail, Send, Workflow, UserRound } from 'lucide-react'
+import {
+  CalendarClock,
+  Layers3,
+  Mail,
+  MessageSquareText,
+  Send,
+  SlidersHorizontal
+} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import Footer from './Footer'
 
 const tabs = [
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { href: '/sent', label: 'Sent', icon: Send },
-  { href: '/automation', label: 'Automation', icon: Workflow },
-  { href: '/control', label: 'Control', icon: UserRound }
+  { href: '/scheduled', label: 'Scheduled', icon: CalendarClock },
+  { href: '/sms', label: 'SMS', icon: MessageSquareText },
+  { href: '/automation', label: 'Automation', icon: Layers3 },
+  { href: '/control', label: 'Control', icon: SlidersHorizontal }
 ] as const
 
 export default function BottomNav() {
   const pathname = usePathname()
 
-  // Hide on home page & auth
-  if (!pathname || pathname === '/' || pathname === '/auth' || pathname.startsWith('/blog')) return <Footer/>
+  // Hide on marketing pages & auth
+  if (
+    !pathname ||
+    pathname === '/' ||
+    pathname === '/auth' ||
+    pathname.startsWith('/blog') ||
+    pathname.startsWith('/pricing') ||
+    pathname.startsWith('/contact') ||
+    pathname.startsWith('/changelog')
+  )
+    return null
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 md:hidden z-50">
-      <div className="mx-auto max-w-screen-sm px-4 pb-[env(safe-area-inset-bottom)]">
-        <div
-          className="
-            mb-4 rounded-2xl border 
-            border-slate-200 bg-white/90 backdrop-blur-xl shadow-lg
-            dark:border-white/10 dark:bg-white/5
-          "
-        >
-          <div className="grid grid-cols-4 gap-1 p-2">
+    <nav className='fixed inset-x-0 bottom-0 z-50 md:hidden'>
+      <div className='mx-auto max-w-screen-sm px-4 pb-[env(safe-area-inset-bottom)]'>
+        <div className='mb-4 rounded-2xl border border-slate-200 bg-white/90 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5'>
+          <div className='grid grid-cols-6 gap-1 p-2'>
             {tabs.map(({ href, label, icon: Icon }) => {
               const active =
                 pathname === href || pathname.startsWith(href + '/')
@@ -46,8 +57,8 @@ export default function BottomNav() {
                       : 'text-slate-500 hover:text-black dark:text-white/60 dark:hover:text-white'
                   ].join(' ')}
                 >
-                  <Icon className="mb-1 h-5 w-5" />
-                  <span className="leading-none">{label}</span>
+                  <Icon className='mb-1 h-5 w-5' />
+                  <span className='leading-none'>{label}</span>
                 </Link>
               )
             })}

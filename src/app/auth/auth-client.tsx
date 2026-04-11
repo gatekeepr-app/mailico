@@ -1,6 +1,5 @@
 'use client'
 
-import { supabase } from '@/lib/supabase/client'
 import { Loader2, Lock, Mail, User } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,16 +9,26 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { signIn, signUp } from '@/lib/auth-api'
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
+}
+
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+
+function getSafeNextPath(value: string | null) {
+  if (!value) return '/profile'
+  if (!value.startsWith('/')) return '/profile'
+  if (value.startsWith('//')) return '/profile'
+  return value
 }
 
 export default function AuthPage() {
   const router = useRouter()
 
   const params = useSearchParams()
-  const nextPath = params.get('next') || '/profile'
+  const nextPath = getSafeNextPath(params.get('next'))
   const initialMode = params.get('mode') === 'signup' ? 'signup' : 'signin'
 
   const [mode, setMode] = React.useState<'signin' | 'signup'>(initialMode)
@@ -28,14 +37,27 @@ export default function AuthPage() {
   const [name, setName] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
+  const [avatarUrl, setAvatarUrl] = React.useState('')
 
-  // If already logged in, go to app
   React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace(nextPath)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let active = true
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
+        if (!res.ok) return
+        const payload = await res.json()
+        if (active && payload?.user) {
+          router.replace(nextPath)
+        }
+      } catch {
+        // ignore session fetch errors
+      }
+    }
+    checkSession()
+    return () => {
+      active = false
+    }
+  }, [nextPath, router])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,40 +66,35 @@ export default function AuthPage() {
       toast.error('Please fill in email and password.')
       return
     }
-    if (mode === 'signup' && !name.trim()) {
-      toast.error('Please enter your name.')
-      return
+    if (mode === 'signup') {
+      if (!name.trim()) {
+        toast.error('Please enter your name.')
+        return
+      }
+      if (!PASSWORD_RULE.test(password)) {
+        toast.error(
+          'Password must be 8+ chars with upper, lower, number, and special character.'
+        )
+        return
+      }
     }
 
     setLoading(true)
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email,
+        await signUp(
+          name.trim(),
+          email.trim().toLowerCase(),
           password,
-          options: {
-            data: { name: name.trim() },
-            emailRedirectTo: `${window.location.origin}/auth/confirm`
-          }
-        })
-        if (error) throw error
-
-        toast.success(
-          'Account created. Check your email to confirm (if enabled).'
+          avatarUrl.trim() || undefined
         )
-        // You can redirect right away OR wait for confirmation flow
-        router.replace('/sent')
+        toast.success('Account created. You are now signed in.')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        if (error) throw error
-
+        await signIn(email.trim().toLowerCase(), password)
         toast.success('Signed in!')
-        router.replace(nextPath)
-        router.refresh()
       }
+      router.replace(nextPath)
+      router.refresh()
     } catch (err: any) {
       toast.error(err?.message || 'Authentication failed.')
     } finally {
@@ -86,9 +103,8 @@ export default function AuthPage() {
   }
 
   return (
-    <main className='min-h-screen bg-[#f6f8fc] px-4 py-10 text-slate-900 dark:bg-black dark:text-white'>
+    <main className='min-h-screen bg-background px-4 py-10 text-foreground transition-colors'>
       <div className='mx-auto grid w-full max-w-[1040px] gap-6 md:grid-cols-2'>
-        {/* Left: Brand */}
         <div className='hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5 md:block md:p-8'>
           <div className='flex items-center gap-3'>
             <div className='grid h-12 w-12 place-items-center rounded-2xl bg-[#e8f0fe] dark:bg-white/10'>
@@ -118,8 +134,7 @@ export default function AuthPage() {
                 BYO Resend key
               </div>
               <div className='mt-1'>
-                Later you’ll store your API key securely and send on your
-                behalf—server-only.
+                Store your API key securely and send on your behalf—server-only.
               </div>
             </div>
 
@@ -134,7 +149,6 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Right: Auth card */}
         <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5 md:p-8'>
           <div className='flex flex-col items-center justify-between'>
             <div className='flex rounded-full border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/5'>
@@ -229,7 +243,7 @@ export default function AuthPage() {
               </div>
               <div className='flex flex-col items-start justify-between'>
                 <span className='text-xs text-slate-500 dark:text-slate-400'>
-                  Minimum 8 chars recommended
+                  Must be 8+ chars, upper/lowercase, number, special char
                 </span>
                 {mode === 'signin' && (
                   <Link
@@ -241,6 +255,20 @@ export default function AuthPage() {
                 )}
               </div>
             </div>
+
+            {mode === 'signup' && (
+              <div className='space-y-2'>
+                <Label htmlFor='avatar'>Avatar URL (optional)</Label>
+                <Input
+                  id='avatar'
+                  value={avatarUrl}
+                  onChange={e => setAvatarUrl(e.target.value)}
+                  placeholder='https://…'
+                  className='h-11 rounded-xl'
+                  autoComplete='url'
+                />
+              </div>
+            )}
 
             <Button
               type='submit'

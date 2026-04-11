@@ -1,15 +1,19 @@
-import BottomNav from '@/components/Layout/BottomNav'
+import GlobalAuthNav from '@/components/global-auth-nav'
 import { Toaster } from '@/components/ui/sonner'
+import { getIdentityFromCookies } from '@/lib/identity/server'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { ConvexClientProvider } from './ConvexClientProvider'
 import './globals.css'
+import PwaRegister from './pwa-register'
 
 const inter = Inter({ subsets: ['latin'] })
 
 const APP_NAME = 'Mailico'
 const APP_DEFAULT_TITLE = 'Mailico — Email infrastructure for product teams'
 const APP_TITLE_TEMPLATE = '%s - Mailico'
-const APP_DESCRIPTION = 'The modern email layer for SaaS. Ship transactional & marketing emails from one dashboard.'
+const APP_DESCRIPTION =
+  'The modern email layer for SaaS. Ship transactional & marketing emails from one dashboard.'
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
@@ -36,7 +40,7 @@ export const metadata: Metadata = {
   },
 
   other: {
-    'apple-mobile-web-app-capable': 'yes',
+    'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'black-translucent'
   },
   appleWebApp: {
@@ -71,23 +75,30 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   minimumScale: 1,
-  maximumScale: 1,
+  maximumScale: 1
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await getIdentityFromCookies()
+
   return (
-    <html lang='en'>
-      <body className={inter.className}>
-        <div className='mx-auto bg-[#f6f8fc] flex min-h-screen flex-col'>
-          <main className='flex grow flex-col'>{children}</main>
-          <BottomNav />
-        </div>  
+    <html lang='en' suppressHydrationWarning>
+      <body
+        className={`${inter.className} bg-background text-foreground antialiased`}
+      >
+        <ConvexClientProvider>
+          <GlobalAuthNav user={session?.user} />
+          <div className='mx-auto flex min-h-screen flex-col bg-background text-foreground transition-colors'>
+            <main className='flex grow flex-col'>{children}</main>
+          </div>
+          <PwaRegister />
+          <Toaster />
+        </ConvexClientProvider>
       </body>
-      <Toaster />
     </html>
   )
 }

@@ -1,0 +1,19 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mailico light favicon">
+  <rect width="64" height="64" rx="14" fill="#F8FAFC" />
+  <path
+    d="M18 22h28a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4zm28.4 5.6-12 9.4a4 4 0 0 1-4.8 0l-12-9.4"
+    fill="none"
+    stroke="#0F172A"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M20 40.5 28.7 34a2 2 0 0 1 2.6 0L40 40.5"
+    fill="none"
+    stroke="#0F172A"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

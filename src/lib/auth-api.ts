@@ -1,54 +1,85 @@
-import { supabase } from '@/lib/supabase/client'
+const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
-export async function signUp(name: string, email: string, password: string) {
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { name } // stored in raw_user_meta_data
+async function ensureOk(response: Response, fallback = 'Request failed') {
+  if (response.ok) return
+
+  let payload: any = null
+  const text = await response.text().catch(() => '')
+  if (text) {
+    try {
+      payload = JSON.parse(text)
+    } catch {
+      payload = text
     }
+  }
+
+  const errorMessage =
+    typeof payload === 'string'
+      ? payload
+      : payload?.error || payload?.message || fallback
+
+  throw new Error(errorMessage)
+}
+
+export async function signUp(
+  name: string,
+  email: string,
+  password: string,
+  avatarUrl?: string
+) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      avatarUrl: avatarUrl || undefined
+    })
   })
-  if (error) throw error
+  await ensureOk(res, 'Registration failed')
 }
 
 export async function signIn(email: string, password: string) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw error
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ email, password })
+  })
+  await ensureOk(res, 'Login failed')
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw error
+  const res = await fetch('/api/auth/logout', { method: 'POST' })
+  await ensureOk(res, 'Failed to sign out')
 }
 
 export async function fetchMe() {
-  const { data: authData, error: authErr } = await supabase.auth.getUser()
-  if (authErr) throw authErr
+  const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' })
+  if (!sessionRes.ok) {
+    const payload = await sessionRes.json().catch(() => ({}))
+    throw new Error(payload?.error || 'Failed to load session')
+  }
 
-  const user = authData.user
-  if (!user) return { user: null }
+  const sessionPayload = await sessionRes.json()
+  const identity = sessionPayload?.user
 
-  // pull profile + sender identities
-  const { data: profile, error: pErr } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
+  if (!identity) return { user: null }
 
-  if (pErr) throw pErr
+  const profileRes = await fetch('/api/profile', { cache: 'no-store' })
+  if (!profileRes.ok) {
+    const payload = await profileRes.json().catch(() => ({}))
+    throw new Error(payload?.error || 'Failed to load profile')
+  }
 
-  const { data: senders, error: sErr } = await supabase
-    .from('sender_identities')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('id', { ascending: true })
-
-  if (sErr) throw sErr
+  const payload = await profileRes.json()
+  const profile = payload?.profile ?? {}
+  const senders = payload?.senders ?? []
 
   return {
     user: {
-      id: user.id,
-      email: user.email,
+      id: identity._id || identity.id,
+      email: identity.email,
       ...profile,
       default_email: senders
     }

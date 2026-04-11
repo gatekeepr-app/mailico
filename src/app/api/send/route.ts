@@ -1,24 +1,57 @@
+import { api, createConvexServerClient } from '@/lib/convex/server-client'
+import { requireIdentity } from '@/lib/identity/server'
+import { decryptSecret } from '@/lib/secrets'
+import { assertSameOrigin } from '@/lib/security/csrf'
+import { getClientIp, rateLimit } from '@/lib/security/rate-limit'
 import { Resend } from 'resend'
-import { EmailTemplate } from '@/components/Features/EmailTemplate'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
+function stripHtml(input: string) {
+  return input
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function POST(request: Request) {
   try {
-    const supabase = createSupabaseServerClient()
-
-    // 1️⃣ Authenticate user
-    const {
-      data: { user },
-      error: authError
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    const originError = assertSameOrigin(request)
+    if (originError) {
+      return Response.json({ error: originError.error }, { status: 403 })
     }
 
-    // 2️⃣ Parse request body
+    let identity
+    try {
+      identity = await requireIdentity()
+    } catch (error: any) {
+      return Response.json(
+        { error: error?.message || 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const ip = getClientIp(request)
+    const rateLimitResult = rateLimit(`send:email:${identity.userId}:${ip}`, {
+      windowMs: 60_000,
+      limit: 60
+    })
+
+    if (!rateLimitResult.allowed) {
+      return Response.json(
+        { error: 'Too many send attempts. Try again shortly.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil(
+              (rateLimitResult.resetAt - Date.now()) / 1000
+            ).toString()
+          }
+        }
+      )
+    }
+    const convex = createConvexServerClient()
+
     const body = await request.json()
 
     const from = body?.from as string | undefined
@@ -35,62 +68,101 @@ export async function POST(request: Request) {
       )
     }
 
-    // Process multiple recipients
-    const to = toRaw.split(',').map(e => e.trim()).filter(Boolean)
+    const to = toRaw
+      .split(',')
+      .map(e => e.trim())
+      .filter(Boolean)
 
-    // Process scheduling
     let scheduledAt: string | undefined
     if (scheduledAtRaw) {
-      // Ensure ISO format
       scheduledAt = new Date(scheduledAtRaw).toISOString()
     }
 
-    // 3️⃣ Fetch user’s profile and usage metrics
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('resend_api_key, plan')
-      .eq('user_id', user.id)
-      .single()
+    const profile = await convex.query(api.profiles.getByUserId, {
+      userId: identity.userId,
+      sessionToken: identity.token
+    })
 
-    if (profileError || !profile?.resend_api_key) {
+    const senders = await convex.query(api.senderIdentities.listByUser, {
+      userId: identity.userId,
+      sessionToken: identity.token
+    })
+
+    const normalizedFrom = from.trim().toLowerCase()
+    const allowedSender = senders.find(
+      sender => sender.address.toLowerCase() === normalizedFrom
+    )
+
+    if (!allowedSender) {
       return Response.json(
-        { error: 'Resend API key not configured' },
+        {
+          error: 'Choose a verified sender identity before sending.',
+          reason: 'Save the address under Sender Identities first.'
+        },
         { status: 400 }
       )
     }
 
-    const planName = (profile?.plan || 'free').toLowerCase()
-    
-    // 4️⃣ Check Usage Limits
-    const { data: usage, error: usageError } = await supabase
-      .from('usage_metrics')
-      .select('emails_sent')
-      .eq('user_id', user.id)
-      .single()
+    const fromDomain = normalizedFrom.split('@')[1]
+    const allowedDomains = new Set<string>()
+    if (profile?.domain) {
+      allowedDomains.add(profile.domain.trim().toLowerCase())
+    }
+    senders.forEach(sender => {
+      const part = sender.address.split('@')[1]?.toLowerCase()
+      if (part) allowedDomains.add(part)
+    })
 
-    // If usage metrics don't exist, we'll create them later
+    if (!fromDomain || !allowedDomains.has(fromDomain)) {
+      return Response.json(
+        {
+          error: 'Sender domain is not approved',
+          reason:
+            'Update your domain in Settings → Profile to match this address.'
+        },
+        { status: 400 }
+      )
+    }
+
+    const planName = (
+      profile?.plan_name ||
+      profile?.plan ||
+      'free'
+    ).toLowerCase()
+
+    const usage = await convex.query(api.usage.getByUserId, {
+      userId: identity.userId,
+      sessionToken: identity.token
+    })
     const emailsSent = usage?.emails_sent || 0
-    
+
     const LIMITS: Record<string, number> = {
       free: 3000,
       pro: 50000,
-      enterprise: 1000000000 // Effectively unlimited
+      enterprise: 1000000000
     }
 
     const limit = LIMITS[planName] || LIMITS.free
 
     if (emailsSent >= limit) {
       return Response.json(
-        { 
-          error: 'Monthly email limit reached', 
-          reason: `You have reached the limit for your ${planName} plan (${limit.toLocaleString()} emails).` 
-        }, 
+        {
+          error: 'Monthly email limit reached',
+          reason: `You have reached the limit for your ${planName} plan (${limit.toLocaleString()} emails).`
+        },
         { status: 403 }
       )
     }
 
-    // 5️⃣ Send email
-    const resend = new Resend(profile.resend_api_key)
+    if (!profile?.resend_api_key) {
+      return Response.json(
+        { error: 'Resend API key not configured' },
+        { status: 400 }
+      )
+    }
+
+    const resendKey = decryptSecret(profile.resend_api_key) as string
+    const resend = new Resend(resendKey)
 
     const fromHeader = `${fromName} <${from}>`
 
@@ -98,7 +170,8 @@ export async function POST(request: Request) {
       from: fromHeader,
       to,
       subject,
-      react: message,
+      html: message,
+      text: stripHtml(message),
       scheduledAt: scheduledAt
     })
 
@@ -107,82 +180,64 @@ export async function POST(request: Request) {
       return Response.json({ error }, { status: 500 })
     }
 
-    // 5️⃣ Save sent email (Sender's Copy)
-    await supabase.from('emails').insert({
-      user_id: user.id,
+    await convex.mutation(api.emails.create, {
+      user_id: identity.userId,
+      sessionToken: identity.token,
       direction: scheduledAt ? 'scheduled' : 'sent',
       from_email: from,
       to_email: to.join(', '),
       subject,
       message,
+      created_at: new Date().toISOString()
     })
 
-    // 6️⃣ Deliver to Internal Inbox (Recipient's Copy)
-    // Only if not scheduled (immediate delivery) to keep logic simple for now
     if (!scheduledAt) {
       try {
-        const { createClient } = await import('@supabase/supabase-js')
-        const adminAuthClient = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false
-            }
-          }
+        const adminSecret = process.env.CONVEX_ADMIN_SECRET
+        if (!adminSecret) {
+          throw new Error('CONVEX_ADMIN_SECRET is not configured')
+        }
+
+        const identities = await convex.query(
+          api.senderIdentities.findByAddresses,
+          { addresses: to, adminSecret }
         )
 
-        // Find users who own these email addresses
-        // Note: This relies on sender_identities being the source of truth for "receiving" addresses too
-        const { data: identities } = await adminAuthClient
-          .from('sender_identities')
-          .select('user_id, address')
-          .in('address', to)
-
-        if (identities && identities.length > 0) {
-          const inboxInserts = identities.map(identity => ({
-            user_id: identity.user_id,
-            direction: 'inbox',
-            from_email: from,
-            to_email: to.join(', '), // Recipient sees all To addresses
-            subject,
-            message,
-            created_at: new Date().toISOString() // Ensure immediate timestamp
-          }))
-
-          await adminAuthClient.from('emails').insert(inboxInserts)
+        if (identities.length > 0) {
+          await convex.mutation(api.emails.bulkInsert, {
+            adminSecret,
+            emails: identities.map(identityRecord => ({
+              user_id: identityRecord.user_id,
+              direction: 'inbox',
+              from_email: from,
+              to_email: to.join(', '),
+              subject,
+              message,
+              created_at: new Date().toISOString()
+            }))
+          })
         }
       } catch (err) {
         console.error('Failed to deliver internal inbox message:', err)
-        // Don't fail the request if internal delivery fails, just log it
       }
     }
 
-    // 5.5️⃣ Update usage metrics
     try {
-      const { data: usageData, error: usageUpdateError } = await supabase
-        .from('usage_metrics')
-        .update({ emails_sent: emailsSent + 1, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .select()
-
-      if (!usageData || usageData.length === 0) {
-        // Record might not exist, create it
-        await supabase.from('usage_metrics').insert({
-          user_id: user.id,
-          emails_sent: 1,
-          updated_at: new Date().toISOString()
-        })
-      }
+      await convex.mutation(api.usage.incrementEmailCount, {
+        userId: identity.userId,
+        sessionToken: identity.token,
+        amount: 1
+      })
     } catch (err) {
       console.error('Failed to update usage metrics:', err)
-      // Non-fatal error for the user
     }
 
     return Response.json({ success: true, data }, { status: 200 })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Send API error:', err)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json(
+      { error: err?.message || 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

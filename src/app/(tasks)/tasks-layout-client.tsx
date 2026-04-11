@@ -1,15 +1,12 @@
 'use client'
 
+import BottomNav from '@/components/Layout/BottomNav'
 import ComposeModal from '@/components/Layout/ComposeModal'
 import SideBar from '@/components/Layout/SideBar'
-import { Button } from '@/components/ui/button'
-import { Mail, RefreshCcw, Settings, User } from 'lucide-react'
-import Image from 'next/image'
-import * as React from 'react'
-import { toast } from 'sonner'
-import { ComposeContext } from './compose-context'
+import { User } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ReactNode, useState } from 'react'
+import { ComposeContext } from './compose-context'
 
 type User = {
   name: string
@@ -33,16 +30,16 @@ export default function TasksLayoutClient({
       <ComposeModal open={composeOpen} onOpenChange={setComposeOpen} />
 
       {/* App shell */}
-      <div className='min-h-screen bg-[#f6f8fc] dark:bg-black'>
+      <div className='min-h-screen bg-background text-foreground transition-colors'>
         <div className='mx-auto max-w-[1400px] px-3 py-4 md:px-5'>
           {/* Top bar */}
-          <div className='sticky top-0 z-30 border-b border-black/5 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-black/60'>
+          {/* <div className='sticky top-0 z-30 border-b border-black/5 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-black/60'>
             <div className='mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-3 md:px-5'>
               <div className='flex items-center gap-2'>
                 <div className='grid h-9 w-9 place-items-center rounded-full bg-[#e9eef6] dark:bg-white/10'>
                   <Mail className='h-5 w-5' />
                 </div>
-                <div className='hidden text-md font-semibold md:block'>
+                <div className='text-md hidden font-semibold md:block'>
                   Mailico
                 </div>
               </div>
@@ -58,7 +55,7 @@ export default function TasksLayoutClient({
                 <Button
                   variant='ghost'
                   className='h-10 rounded-full'
-                  onClick={() => router.push('/control') }
+                  onClick={() => router.push('/control')}
                 >
                   <Settings className='h-4 w-4' />
                 </Button>
@@ -78,7 +75,9 @@ export default function TasksLayoutClient({
                     </div>
                   )}
                   <div className='hidden pr-2 md:block'>
-                    <div className='text-xs font-semibold leading-4'>{user?.name}</div>
+                    <div className='text-xs font-semibold leading-4'>
+                      {user?.name}
+                    </div>
                     <div className='text-[11px] leading-4 text-slate-500 dark:text-slate-400'>
                       {user?.email}
                     </div>
@@ -86,7 +85,7 @@ export default function TasksLayoutClient({
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
           <div className='grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]'>
             {/* Sidebar */}
             <aside className='hidden md:block'>
@@ -94,9 +93,10 @@ export default function TasksLayoutClient({
             </aside>
 
             {/* Page content */}
-            <main>{children}</main>
+            <main className='pb-24 md:pb-6'>{children}</main>
           </div>
         </div>
+        <BottomNav />
       </div>
     </ComposeContext.Provider>
   )

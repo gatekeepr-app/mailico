@@ -1,48 +1,53 @@
 /** @type {import('next').NextConfig} */
-import withSerwistInit from "@serwist/next";
+import withSerwistInit from '@serwist/next'
 
 const withSerwist = withSerwistInit({
-  swSrc: "src/app/sw.ts",   // your SW source (TS)
-  swDest: "public/sw.js",   // emitted SW path at runtime
+  swSrc: 'src/app/sw.ts', // your SW source (TS)
+  swDest: 'public/sw.js', // emitted SW path at runtime
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV === "development", // no SW in dev
-});
+  disable: process.env.NODE_ENV === 'development' // no SW in dev
+})
+
+const remoteHosts = (process.env.NEXT_IMAGE_REMOTE_HOSTS || 'i.pravatar.cc')
+  .split(',')
+  .map(host => host.trim())
+  .filter(Boolean)
 
 const nextConfig = {
   reactStrictMode: true,
-   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-        pathname: "/**",
-      },
-    ],
+  images: {
+    remotePatterns: remoteHosts.map(hostname => ({
+      protocol: 'https',
+      hostname
+    }))
   },
   async headers() {
     return [
       // Make sure the browser always fetches the latest SW
       {
-        source: "/sw.js",
+        source: '/sw.js',
         headers: [
-          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
-          { key: "Pragma", value: "no-cache" },
-          { key: "Expires", value: "0" },
-          { key: "Service-Worker-Allowed", value: "/" } // scope root
-        ],
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate'
+          },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+          { key: 'Service-Worker-Allowed', value: '/' } // scope root
+        ]
       },
       // Avoid aggressively caching the manifest
       {
-        source: "/manifest.json",
-        headers: [{ key: "Cache-Control", value: "no-cache" }],
+        source: '/manifest.json',
+        headers: [{ key: 'Cache-Control', value: 'no-cache' }]
       },
       // Icons shouldn’t be immutable if you iterate them during testing
       {
-        source: "/favicon/:path*",
-        headers: [{ key: "Cache-Control", value: "public, max-age=3600" }],
-      },
-    ];
-  },
-};
+        source: '/favicon/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=3600' }]
+      }
+    ]
+  }
+}
 
-export default withSerwist(nextConfig);
+export default withSerwist(nextConfig)

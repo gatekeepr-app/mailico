@@ -1,25 +1,21 @@
 'use client'
 
-import { supabase } from '@/lib/supabase/client'
-import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-
-import {
-  Send,
-  Star,
-  StarOff,
-  Trash2
-} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import DOMPurify from 'dompurify'
+import { Send, Star, StarOff, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { useCompose } from '../compose-context'
 
 type Email = {
-  id: string
+  _id: string
+  user_id: string
+  direction: string
   from_email: string
   to_email: string
   subject: string
-  message: string
+  message: string | null
   starred: boolean
   created_at: string
 }
@@ -31,53 +27,65 @@ function formatDate(date: string) {
   })
 }
 
+function sanitizeEmailHtml(input: string) {
+  return DOMPurify.sanitize(input, { USE_PROFILES: { html: true } })
+}
+
 export default function InboxPage() {
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(true)
   const [filtered, setFiltered] = useState<Email[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  
+
   const { setComposeOpen } = useCompose()
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      const { data: auth } = await supabase.auth.getUser()
-      
-      // If authenticating, we might want to filter by user. 
-      // For now, mirroring SentPage logic which fetches based on user_id
-      if (auth.user) {
-        const { data, error } = await supabase
-          .from('emails')
-          .select('*')
-          .eq('user_id', auth.user.id)
-          .eq('direction', 'inbox')
-          .order('created_at', { ascending: false })
+  const loadEmails = useCallback(async () => {
+    try {
+      const res = await fetch('/api/emails?direction=inbox', {
+        cache: 'no-store'
+      })
 
-        if (data) {
-          setEmails(data as Email[])
-          setFiltered(data as Email[])
-        }
-      } else {
+      if (res.status === 401) {
         window.location.href = '/auth?next=/inbox'
+        return
       }
-      setLoading(false)
+
+      if (!res.ok) {
+        console.error('Failed to fetch emails')
+        return
+      }
+
+      const payload = await res.json()
+      setEmails((payload?.emails ?? []) as Email[])
+    } catch (error) {
+      console.error('Error fetching emails', error)
     }
-    load()
   }, [])
 
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    setLoading(true)
+    loadEmails().finally(() => setLoading(false))
+    interval = setInterval(loadEmails, 15000)
+
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+    }
+  }, [loadEmails])
+
+  // When emails state changes, update the filtered list
   useEffect(() => {
     setFiltered(emails)
   }, [emails])
 
-  const selected = emails.find(e => e.id === selectedId)
+  const selected = emails.find(e => e._id === selectedId)
 
   return (
-    <div className='min-h-screen bg-[#f6f8fc] text-slate-900 dark:bg-black dark:text-white'>
-
+    <div className='min-h-screen bg-background text-foreground transition-colors'>
       {/* Main layout */}
       <div className='mx-auto grid max-w-[1400px] grid-cols-1 gap-4 px-3 py-4 md:px-5 lg:grid-cols-[280px_1fr]'>
-
         {/* Content */}
         <main className='grid grid-cols-1 gap-4 lg:grid-cols-[minmax(420px,1fr)_minmax(420px,1fr)]'>
           {/* LIST */}
@@ -118,16 +126,16 @@ export default function InboxPage() {
               <div className='divide-y divide-slate-200 dark:divide-white/10'>
                 {filtered.map(m => (
                   <button
-                    key={m.id}
+                    key={m._id}
                     onClick={() => {
-                      setSelectedId(m.id)
+                      setSelectedId(m._id)
                     }}
                     className={cn(
                       'w-full text-left transition hover:bg-[#f2f6ff] dark:hover:bg-white/5',
                       'px-4 py-3',
                       'grid gap-2',
                       'grid-cols-[24px_1fr] sm:grid-cols-[24px_1fr_90px]',
-                      selectedId === m.id && 'bg-[#e8f0fe] dark:bg-white/10'
+                      selectedId === m._id && 'bg-[#e8f0fe] dark:bg-white/10'
                     )}
                   >
                     <div className='flex items-center justify-center'>
@@ -140,7 +148,7 @@ export default function InboxPage() {
 
                     <div className='min-w-0'>
                       <div className='truncate text-sm font-semibold'>
-                         <span className='font-semibold'>{m.from_email}</span>
+                        <span className='font-semibold'>{m.from_email}</span>
                       </div>
                       <div className='truncate text-xs text-slate-600 dark:text-slate-300'>
                         <span className='font-medium text-slate-800 dark:text-white'>
@@ -224,12 +232,16 @@ export default function InboxPage() {
             <div className='p-4'>
               {!selected ? (
                 <div className='grid place-items-center py-20 text-sm text-slate-500 dark:text-slate-400'>
-                  Choose a sent email to preview it here.
+                  Choose an email to preview it here.
                 </div>
               ) : (
                 <div className='space-y-4'>
                   <div className='rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 dark:border-white/10 dark:bg-white/5'>
-                    <div dangerouslySetInnerHTML={{ __html: selected.message }} />
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeEmailHtml(selected.message ?? '')
+                      }}
+                    />
                   </div>
 
                   <div className='flex flex-wrap items-center gap-2'>
@@ -256,7 +268,6 @@ export default function InboxPage() {
           </section>
         </main>
       </div>
-
     </div>
   )
 }

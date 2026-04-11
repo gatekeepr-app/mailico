@@ -1,15 +1,15 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { CalendarClock, Send, Star, StarOff, Trash2 } from 'lucide-react'
+import DOMPurify from 'dompurify'
+import { CalendarClock, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useCompose } from '../compose-context'
 
 type SentEmail = {
-  id: string
+  _id: string
   from_email: string
   to_email: string
   subject: string
@@ -27,6 +27,17 @@ function formatDate(date: string) {
   })
 }
 
+function stripHtml(input: string) {
+  return input
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sanitizeEmailHtml(input: string) {
+  return DOMPurify.sanitize(input, { USE_PROFILES: { html: true } })
+}
+
 export default function ScheduledPage() {
   const [emails, setEmails] = useState<SentEmail[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -34,31 +45,29 @@ export default function ScheduledPage() {
 
   const { setComposeOpen } = useCompose()
 
-  const selected = emails.find(e => e.id === selectedId)
+  const selected = emails.find(e => e._id === selectedId)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
 
-      const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) {
+      const res = await fetch('/api/emails?direction=scheduled', {
+        cache: 'no-store'
+      })
+
+      if (res.status === 401) {
         window.location.href = '/auth?next=/scheduled'
         return
       }
 
-      const { data, error } = await supabase
-        .from('emails')
-        .select('*')
-        .eq('user_id', auth.user.id)
-        .eq('direction', 'scheduled')
-        .order('created_at', { ascending: false })
-
-      if (error) {
+      if (!res.ok) {
         toast.error('Failed to load scheduled emails')
-      } else {
-        setEmails((data ?? []) as SentEmail[])
+        setLoading(false)
+        return
       }
 
+      const payload = await res.json()
+      setEmails((payload?.emails ?? []) as SentEmail[])
       setLoading(false)
     }
 
@@ -110,12 +119,12 @@ export default function ScheduledPage() {
               <div className='divide-y divide-slate-200 dark:divide-white/10'>
                 {emails.map(m => (
                   <button
-                    key={m.id}
-                    onClick={() => setSelectedId(m.id)}
+                    key={m._id}
+                    onClick={() => setSelectedId(m._id)}
                     className={cn(
                       'grid w-full grid-cols-[24px_1fr_90px] items-center gap-2 px-4 py-3 text-left transition',
                       'hover:bg-[#f2f6ff] dark:hover:bg-white/5',
-                      selectedId === m.id && 'bg-[#e8f0fe] dark:bg-white/10'
+                      selectedId === m._id && 'bg-[#e8f0fe] dark:bg-white/10'
                     )}
                   >
                     <div className='flex items-center justify-center'>
@@ -131,7 +140,7 @@ export default function ScheduledPage() {
                           {m.subject || '(no subject)'}
                         </span>
                         <span className='mx-2 text-slate-400'>—</span>
-                        {m.message}
+                        {stripHtml(m.message)}
                       </div>
                     </div>
 
@@ -177,7 +186,8 @@ export default function ScheduledPage() {
                   <b>To:</b> {selected.to_email}
                 </span>
                 <span className='hidden sm:inline'>
-                  <b>Created:</b> {new Date(selected.created_at).toLocaleString()}
+                  <b>Created:</b>{' '}
+                  {new Date(selected.created_at).toLocaleString()}
                 </span>
               </div>
             )}
@@ -191,14 +201,20 @@ export default function ScheduledPage() {
             ) : (
               <div className='space-y-4'>
                 <div className='rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 dark:border-white/10 dark:bg-white/5'>
-                  {selected.message}
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeEmailHtml(selected.message)
+                    }}
+                  />
                 </div>
 
                 <div className='flex flex-wrap items-center gap-2'>
                   <Button
                     variant='outline'
                     className='rounded-full'
-                    onClick={() => toast.message('Cancel schedule (coming soon)')}
+                    onClick={() =>
+                      toast.message('Cancel schedule (coming soon)')
+                    }
                   >
                     <Trash2 className='mr-2 h-4 w-4' />
                     Cancel Schedule

@@ -1,72 +1,136 @@
 'use client'
 
-import React from 'react'
+import {
+  CalendarClock,
+  CircleUser,
+  CreditCard,
+  Inbox,
+  Layers3,
+  MessageCircle,
+  MessageSquareText,
+  Pencil,
+  Plug,
+  Send,
+  SlidersHorizontal
+} from 'lucide-react'
 import { usePathname } from 'next/navigation'
-import { Button } from '../ui/button'
-import { CalendarClock, FileText, Inbox, Pencil, Send, Trash2 } from 'lucide-react'
+import React from 'react'
 import { NavItem } from '../Elements/NavItem'
+import { Button } from '../ui/button'
 
 type SideBarProps = {
   setComposeOpen: React.Dispatch<React.SetStateAction<boolean>>
-  active?: 'inbox' | 'sent' | 'drafts' | 'scheduled' | 'trash'
+  active?:
+    | 'inbox'
+    | 'sent'
+    | 'scheduled'
+    | 'automation'
+    | 'social'
+    | 'integrations'
+    | 'sms'
+    | 'control'
+    | 'billing'
+    | 'profile'
 }
 
-export default function SideBar({
-  setComposeOpen,
-  active
-}: SideBarProps) {
+export default function SideBar({ setComposeOpen, active }: SideBarProps) {
   const pathname = usePathname()
 
   // If 'active' prop is not provided, derive it from pathname
-  const currentActive = active ?? (
-    pathname.includes('/sent') ? 'sent' :
-    pathname.includes('/drafts') ? 'drafts' :
-    pathname.includes('/scheduled') ? 'scheduled' :
-    pathname.includes('/trash') ? 'trash' :
-    'inbox'
-  )
+  const currentActive =
+    active ??
+    (pathname.includes('/sent')
+      ? 'sent'
+      : pathname.includes('/scheduled')
+        ? 'scheduled'
+        : pathname.includes('/social')
+          ? 'social'
+          : pathname.includes('/integrations')
+            ? 'integrations'
+            : pathname.includes('/sms')
+              ? 'sms'
+              : pathname.includes('/automation')
+                ? 'automation'
+                : pathname.includes('/control')
+                  ? 'control'
+                  : pathname.includes('/billing')
+                    ? 'billing'
+                    : pathname.includes('/profile')
+                      ? 'profile'
+                      : 'inbox')
 
   return (
-    <aside className="pt-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+    <aside className='pt-5'>
+      <div className='rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/5'>
         <Button
           onClick={() => setComposeOpen(true)}
-          className="h-11 w-full justify-start gap-2 rounded-full"
+          className='h-11 w-full justify-start gap-2 rounded-full'
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil className='h-4 w-4' />
           Compose
         </Button>
 
-        <div className="hidden md:block mt-3 space-y-1">
+        <div className='mt-3 space-y-1'>
           <NavItem
-            icon={<Inbox className="h-4 w-4" />}
-            label="Inbox"
-            href="/inbox"
+            icon={<Inbox className='h-4 w-4' />}
+            label='Inbox'
+            href='/inbox'
             active={currentActive === 'inbox'}
           />
           <NavItem
-            icon={<Send className="h-4 w-4" />}
-            label="Sent"
-            href="/sent"
+            icon={<Send className='h-4 w-4' />}
+            label='Sent'
+            href='/sent'
             active={currentActive === 'sent'}
           />
           <NavItem
-            icon={<FileText className="h-4 w-4" />}
-            label="Drafts"
-            href="/drafts"
-            active={currentActive === 'drafts'}
-          />
-          <NavItem
-            icon={<CalendarClock className="h-4 w-4" />}
-            label="Scheduled"
-            href="/scheduled"
+            icon={<CalendarClock className='h-4 w-4' />}
+            label='Scheduled'
+            href='/scheduled'
             active={currentActive === 'scheduled'}
           />
           <NavItem
-            icon={<Trash2 className="h-4 w-4" />}
-            label="Trash"
-            href="/trash"
-            active={currentActive === 'trash'}
+            icon={<MessageSquareText className='h-4 w-4' />}
+            label='SMS'
+            href='/sms'
+            active={currentActive === 'sms'}
+          />
+          <div className='my-2 h-px bg-slate-200 dark:bg-white/10' />
+          <NavItem
+            icon={<Layers3 className='h-4 w-4' />}
+            label='Automation'
+            href='/automation'
+            active={currentActive === 'automation'}
+          />
+          <NavItem
+            icon={<MessageCircle className='h-4 w-4' />}
+            label='Social'
+            href='/social'
+            active={currentActive === 'social'}
+          />
+          <NavItem
+            icon={<Plug className='h-4 w-4' />}
+            label='Integrations'
+            href='/integrations'
+            active={currentActive === 'integrations'}
+          />
+          <NavItem
+            icon={<SlidersHorizontal className='h-4 w-4' />}
+            label='Control'
+            href='/control'
+            active={currentActive === 'control'}
+          />
+          <NavItem
+            icon={<CreditCard className='h-4 w-4' />}
+            label='Billing'
+            href='/billing'
+            active={currentActive === 'billing'}
+          />
+          <NavItem
+            icon={<CircleUser className='h-4 w-4' />}
+            label='Profile'
+            href='/profile'
+            active={currentActive === 'profile'}
           />
         </div>
       </div>

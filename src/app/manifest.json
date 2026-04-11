@@ -8,15 +8,6 @@
   "scope": "/inbox",
   "start_url": "/inbox",
   "display": "standalone",
-  "share_target": {
-    "action": "/add",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  },
   "display_override": ["standalone", "minimal-ui"],
   "theme_color": "#FF4D2E",
   "offline_enabled": true,
