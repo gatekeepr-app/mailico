@@ -15,6 +15,7 @@ const remoteHosts = (process.env.NEXT_IMAGE_REMOTE_HOSTS || 'i.pravatar.cc')
 
 const nextConfig = {
   reactStrictMode: true,
+  turbopack: {},
   images: {
     remotePatterns: remoteHosts.map(hostname => ({
       protocol: 'https',

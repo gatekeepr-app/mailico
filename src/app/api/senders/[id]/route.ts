@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   let identity
   try {
@@ -19,7 +19,7 @@ export async function DELETE(
     )
   }
 
-  const id = params.id
+  const { id } = await params
   if (!id) {
     return NextResponse.json({ error: 'Missing sender id' }, { status: 400 })
   }

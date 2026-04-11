@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "format": "prettier --check . --write \"src/**/*{js,ts,css,scss,json,tsx,jsx,mdx,md}\" \"*.{js,ts,tsx,jsx,mdx,md}\"",
     "prepare": "husky",
     "lint-staged": "lint-staged",
@@ -55,11 +55,12 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "eslint": "^10.2.0",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.3",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.7",
