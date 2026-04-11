@@ -14,21 +14,20 @@ const APP_DEFAULT_TITLE = 'Mailico — Email infrastructure for product teams'
 const APP_TITLE_TEMPLATE = '%s - Mailico'
 const APP_DESCRIPTION =
   'The modern email layer for SaaS. Ship transactional & marketing emails from one dashboard.'
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  'http://localhost:3000'
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
+  metadataBase: new URL(APP_URL),
   title: {
     default: APP_DEFAULT_TITLE,
     template: APP_TITLE_TEMPLATE
   },
   description: APP_DESCRIPTION,
   manifest: '/manifest.json',
-
-  // 🔥 Light & dark browser UI colors
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F8FAFC' },
-    { media: '(prefers-color-scheme: dark)', color: '#05060A' }
-  ],
 
   // 🧊 Light / dark favicons
   icons: {
@@ -75,7 +74,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   minimumScale: 1,
-  maximumScale: 1
+  maximumScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F8FAFC' },
+    { media: '(prefers-color-scheme: dark)', color: '#05060A' }
+  ]
 }
 
 export default async function RootLayout({
