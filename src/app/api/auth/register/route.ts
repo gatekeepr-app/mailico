@@ -100,5 +100,5 @@ export async function POST(request: Request) {
 
   await setSessionCookie(sessionToken)
 
-  return NextResponse.json({ sessionToken })
+  return NextResponse.json({ ok: true })
 }

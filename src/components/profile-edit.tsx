@@ -269,9 +269,9 @@ export default function ProfileEditClient() {
           throw new Error('Failed to validate domain usage')
         }
 
-        const { count } = await domainRes.json()
+        const { allowed } = await domainRes.json()
 
-        if ((count || 0) >= limits.maxTotalUsersForDomain) {
+        if (!allowed) {
           const reason = await fetchRejectionReason()
           toast.error(
             `${reason} (The domain ${trimmedDomain} has reached the maximum of ${limits.maxTotalUsersForDomain} users allowed on the ${userPlan} plan.)`

@@ -317,8 +317,9 @@ export default function AuthPage() {
 }
 
 function getAuthErrorMessage(error: unknown, mode: 'signin' | 'signup') {
-  const message =
+  const rawMessage =
     typeof error === 'string' ? error : (error as { message?: string })?.message
+  const message = sanitizeAuthMessage(rawMessage)
 
   if (!message) {
     return mode === 'signup'
@@ -341,4 +342,15 @@ function getAuthErrorMessage(error: unknown, mode: 'signin' | 'signup') {
   }
 
   return message
+}
+
+function sanitizeAuthMessage(message?: string | null) {
+  if (!message) return ''
+  const trimmed = message.trim()
+  if (!trimmed) return ''
+  if (trimmed.includes('<') && trimmed.includes('>')) {
+    const withoutTags = trimmed.replace(/<[^>]*>/g, ' ')
+    return withoutTags.replace(/\s+/g, ' ').trim()
+  }
+  return trimmed
 }

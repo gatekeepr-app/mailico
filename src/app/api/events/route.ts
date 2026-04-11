@@ -30,23 +30,107 @@ export async function POST(req: NextRequest) {
   const payload = await req.text()
 
   const convex = createConvexServerClient()
-
-  let preliminaryEvent: ResendAnyEvent | null = null
-  try {
-    preliminaryEvent = JSON.parse(payload)
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: 'Invalid JSON payload' },
-      { status: 400 }
-    )
+  const svixHeaders = {
+    'svix-id': req.headers.get('svix-id') ?? '',
+    'svix-timestamp': req.headers.get('svix-timestamp') ?? '',
+    'svix-signature': req.headers.get('svix-signature') ?? ''
   }
 
-  const potentialRecipient = (preliminaryEvent as ResendEmailReceivedEvent)
-    ?.data?.to?.[0]
+  if (
+    !svixHeaders['svix-id'] ||
+    !svixHeaders['svix-timestamp'] ||
+    !svixHeaders['svix-signature']
+  ) {
+    return new NextResponse('Invalid webhook', { status: 400 })
+  }
 
-  if (!potentialRecipient) {
+  const globalWebhookSecret = process.env.RESEND_WEBHOOK_SECRET
+  let verified: unknown
+  let event: ResendAnyEvent
+  let mailbox: { user_id?: string } | null = null
+  let profile: {
+    webhook_secret?: string | null
+    resend_api_key?: string | null
+  } | null = null
+
+  if (globalWebhookSecret) {
+    try {
+      const wh = new Webhook(globalWebhookSecret)
+      verified = wh.verify(payload, svixHeaders)
+    } catch {
+      return new NextResponse('Invalid webhook', { status: 400 })
+    }
+    event = verified as ResendAnyEvent
+  } else {
+    let preliminaryEvent: ResendAnyEvent | null = null
+    try {
+      preliminaryEvent = JSON.parse(payload)
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid JSON payload' },
+        { status: 400 }
+      )
+    }
+
+    const potentialRecipient = (preliminaryEvent as ResendEmailReceivedEvent)
+      ?.data?.to?.[0]
+
+    if (!potentialRecipient) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing recipient address' },
+        { status: 400 }
+      )
+    }
+
+    const adminSecret = process.env.CONVEX_ADMIN_SECRET
+    if (!adminSecret) {
+      return NextResponse.json(
+        { ok: false, error: 'Server misconfigured' },
+        { status: 500 }
+      )
+    }
+
+    mailbox = await convex.query(api.mailboxes.findByAddress, {
+      address: potentialRecipient,
+      adminSecret
+    })
+
+    if (!mailbox?.user_id) {
+      return NextResponse.json({ ok: true, ignored: true })
+    }
+
+    profile = await convex.query(api.profiles.getByUserId, {
+      userId: mailbox.user_id,
+      adminSecret
+    })
+
+    const webhookSecret = profile?.webhook_secret
+    if (!webhookSecret) {
+      return new NextResponse('Missing RESEND_WEBHOOK_SECRET', { status: 500 })
+    }
+
+    try {
+      const wh = new Webhook(webhookSecret)
+      verified = wh.verify(payload, svixHeaders)
+    } catch {
+      return new NextResponse('Invalid webhook', { status: 400 })
+    }
+    event = verified as ResendAnyEvent
+  }
+
+  // Now treat it as our event shape
+  if (event.type !== 'email.received') {
+    return NextResponse.json({ ok: true })
+  }
+
+  const received = event as ResendEmailReceivedEvent
+
+  const emailId = received.data.email_id
+  const recipient = received.data.to?.[0]
+
+  if (!emailId || !recipient) {
     return NextResponse.json(
-      { ok: false, error: 'Missing recipient address' },
+      { ok: false, error: 'Missing email_id or recipient' },
       { status: 400 }
     )
   }
@@ -59,55 +143,22 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const mailbox = await convex.query(api.mailboxes.findByAddress, {
-    address: potentialRecipient,
-    adminSecret
-  })
+  if (!mailbox) {
+    mailbox = await convex.query(api.mailboxes.findByAddress, {
+      address: recipient,
+      adminSecret
+    })
+  }
 
   if (!mailbox?.user_id) {
     return NextResponse.json({ ok: true, ignored: true })
   }
 
-  const profile = await convex.query(api.profiles.getByUserId, {
-    userId: mailbox.user_id,
-    adminSecret
-  })
-
-  const webhookSecret = profile?.webhook_secret
-  if (!webhookSecret) {
-    return new NextResponse('Missing RESEND_WEBHOOK_SECRET', { status: 500 })
-  }
-
-  // Verify signature with Svix
-  let verified: unknown
-  try {
-    const wh = new Webhook(webhookSecret)
-    verified = wh.verify(payload, {
-      'svix-id': req.headers.get('svix-id') ?? '',
-      'svix-timestamp': req.headers.get('svix-timestamp') ?? '',
-      'svix-signature': req.headers.get('svix-signature') ?? ''
+  if (!profile) {
+    profile = await convex.query(api.profiles.getByUserId, {
+      userId: mailbox.user_id,
+      adminSecret
     })
-  } catch {
-    return new NextResponse('Invalid webhook', { status: 400 })
-  }
-
-  // Now treat it as our event shape
-  const event = verified as ResendAnyEvent
-
-  if (event.type !== 'email.received') {
-    return NextResponse.json({ ok: true })
-  }
-
-  const received = verified as ResendEmailReceivedEvent
-
-  const emailId = received.data.email_id
-  const recipient = received.data.to?.[0]
-
-  if (!emailId || !recipient) {
-    return NextResponse.json(
-      { ok: false, error: 'Missing email_id or recipient' },
-      { status: 400 }
-    )
   }
 
   // Route recipient -> user_id

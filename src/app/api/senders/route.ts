@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     sessionToken: identity.token,
     name,
     address,
-    verified: true
+    verified: false
   })
 
   return NextResponse.json({ ok: true })

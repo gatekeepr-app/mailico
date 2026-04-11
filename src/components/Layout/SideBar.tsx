@@ -7,7 +7,6 @@ import {
   Inbox,
   Layers3,
   LogOut,
-  MessageCircle,
   MessageSquareText,
   Pencil,
   Plug,
@@ -26,7 +25,6 @@ type SideBarProps = {
     | 'sent'
     | 'scheduled'
     | 'automation'
-    | 'social'
     | 'integrations'
     | 'sms'
     | 'control'
@@ -45,21 +43,19 @@ export default function SideBar({ setComposeOpen, active }: SideBarProps) {
       ? 'sent'
       : pathname.includes('/scheduled')
         ? 'scheduled'
-        : pathname.includes('/social')
-          ? 'social'
-          : pathname.includes('/integrations')
-            ? 'integrations'
-            : pathname.includes('/sms')
-              ? 'sms'
-              : pathname.includes('/automation')
-                ? 'automation'
-                : pathname.includes('/control')
-                  ? 'control'
-                  : pathname.includes('/billing')
-                    ? 'billing'
-                    : pathname.includes('/profile')
-                      ? 'profile'
-                      : 'inbox')
+        : pathname.includes('/integrations')
+          ? 'integrations'
+          : pathname.includes('/sms')
+            ? 'sms'
+            : pathname.includes('/automation')
+              ? 'automation'
+              : pathname.includes('/control')
+                ? 'control'
+                : pathname.includes('/billing')
+                  ? 'billing'
+                  : pathname.includes('/profile')
+                    ? 'profile'
+                    : 'inbox')
 
   return (
     <aside className='pt-5'>
@@ -103,12 +99,6 @@ export default function SideBar({ setComposeOpen, active }: SideBarProps) {
             label='Automation'
             href='/automation'
             active={currentActive === 'automation'}
-          />
-          <NavItem
-            icon={<MessageCircle className='h-4 w-4' />}
-            label='Social'
-            href='/social'
-            active={currentActive === 'social'}
           />
           <NavItem
             icon={<Plug className='h-4 w-4' />}

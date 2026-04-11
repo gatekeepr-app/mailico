@@ -41,9 +41,11 @@ export async function GET() {
   })
 
   try {
-    const response = await fetch(
-      `https://panel.smsbangladesh.com/balance?${params.toString()}`
-    )
+    const response = await fetch('https://panel.smsbangladesh.com/balance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
     const resultText = await response.text()
     let balance: string | null = null
 

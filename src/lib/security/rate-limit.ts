@@ -23,11 +23,15 @@ const store =
   (globalThis.__mailicoRateLimitStore = new Map())
 
 export function getClientIp(request: Request) {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) {
-    return forwarded.split(',')[0]?.trim() || 'unknown'
+  const trustProxy = process.env.TRUST_PROXY === 'true'
+  if (trustProxy) {
+    const forwarded = request.headers.get('x-forwarded-for')
+    if (forwarded) {
+      return forwarded.split(',')[0]?.trim() || 'unknown'
+    }
+    return request.headers.get('x-real-ip') || 'unknown'
   }
-  return request.headers.get('x-real-ip') || 'unknown'
+  return 'unknown'
 }
 
 export function rateLimit(

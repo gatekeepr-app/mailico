@@ -73,7 +73,10 @@ export default function CredentialsClient() {
     load()
   }, [load])
 
-  const updateProfile = async (profilePatch: Record<string, any>) => {
+  const updateProfile = async (
+    profilePatch: Record<string, any>,
+    successMessage: string
+  ) => {
     const res = await fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -83,16 +86,19 @@ export default function CredentialsClient() {
     if (!res.ok) {
       throw new Error(result?.error || 'Failed to update credentials')
     }
-    toast.success('Credentials updated')
+    toast.success(successMessage)
     await load()
   }
 
   const saveResend = async () => {
     setSavingResend(true)
     try {
-      await updateProfile({
-        resend_api_key: resendKey.trim() || null
-      })
+      await updateProfile(
+        {
+          resend_api_key: resendKey.trim() || null
+        },
+        'Resend credentials updated'
+      )
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update Resend credentials')
     } finally {
@@ -103,12 +109,16 @@ export default function CredentialsClient() {
   const saveSms = async () => {
     setSavingSms(true)
     try {
-      await updateProfile({
+      const profilePatch: Record<string, any> = {
         sms_user: smsUser.trim() || null,
-        sms_password: smsPassword.trim() || null,
         sms_sender_name: smsSenderName.trim() || null,
         sms_sender_type: smsSenderType
-      })
+      }
+      const normalizedPassword = smsPassword.trim()
+      if (normalizedPassword) {
+        profilePatch.sms_password = normalizedPassword
+      }
+      await updateProfile(profilePatch, 'SMS credentials updated')
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update SMS credentials')
     } finally {

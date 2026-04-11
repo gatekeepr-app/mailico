@@ -18,8 +18,7 @@ function normalizeNumbers(input: string) {
     .filter(Boolean)
 }
 
-function buildSmsUrl(params: {
-  baseUrl: string
+function buildSmsParams(params: {
   user: string
   password: string
   to: string[]
@@ -35,7 +34,7 @@ function buildSmsUrl(params: {
   }
   search.set('to', params.to.join(','))
   search.set('text', params.text)
-  return `${params.baseUrl}?${search.toString()}`
+  return search
 }
 
 export async function POST(request: Request) {
@@ -160,8 +159,7 @@ export async function POST(request: Request) {
       ? 'https://panel.smsbangladesh.com/otp'
       : 'https://panel.smsbangladesh.com/api'
 
-  const url = buildSmsUrl({
-    baseUrl,
+  const params = buildSmsParams({
     user,
     password,
     to,
@@ -171,7 +169,11 @@ export async function POST(request: Request) {
   })
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
     const resultText = await response.text()
 
     if (!response.ok) {

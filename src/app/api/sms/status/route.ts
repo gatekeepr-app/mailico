@@ -49,9 +49,11 @@ export async function GET(request: Request) {
   })
 
   try {
-    const response = await fetch(
-      `https://panel.smsbangladesh.com/smsstatus?${params.toString()}`
-    )
+    const response = await fetch('https://panel.smsbangladesh.com/smsstatus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
     const resultText = await response.text()
 
     if (!response.ok) {

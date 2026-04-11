@@ -14,6 +14,7 @@ type SmsProfile = {
   sms_sender_type?: string | null
   sms_user?: string | null
   sms_password?: string | null
+  has_sms_password?: boolean
 }
 
 export default function SocialsSmsPanel() {
@@ -52,7 +53,7 @@ export default function SocialsSmsPanel() {
         if (profile.sms_sender_name) {
           setFrom(profile.sms_sender_name)
         }
-        setHasCreds(Boolean(profile.sms_user && profile.sms_password))
+        setHasCreds(Boolean(profile.sms_user && profile.has_sms_password))
       } catch {
         // ignore profile load errors
       } finally {

@@ -132,7 +132,6 @@ export async function GET() {
     'sms_sender_name',
     'sms_sender_type',
     'sms_balance_checked_at',
-    'webhook_secret',
     'created_at',
     'updated_at'
   ] as const
@@ -147,6 +146,7 @@ export async function GET() {
   normalizedProfile.has_sms_password = Boolean(profile?.sms_password)
   delete normalizedProfile.resend_api_key
   delete normalizedProfile.sms_password
+  delete normalizedProfile.webhook_secret
 
   return NextResponse.json({ profile: normalizedProfile, senders, usage })
 }
