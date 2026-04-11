@@ -78,5 +78,79 @@ export default defineSchema({
     created_at: v.optional(v.string())
   })
     .index('by_user', ['user_id'])
-    .index('by_address', ['address'])
+    .index('by_address', ['address']),
+
+  chat_conversations: defineTable({
+    user_id: v.string(),
+    channel: v.string(),
+    external_conversation_id: v.string(),
+    external_user_id: v.optional(v.string()),
+    created_at: v.optional(v.string()),
+    last_message_at: v.optional(v.string())
+  })
+    .index('by_user', ['user_id'])
+    .index('by_user_channel_external', [
+      'user_id',
+      'channel',
+      'external_conversation_id'
+    ]),
+
+  chat_messages: defineTable({
+    user_id: v.string(),
+    conversation_id: v.string(),
+    channel: v.string(),
+    external_message_id: v.optional(v.string()),
+    external_user_id: v.optional(v.string()),
+    text: v.optional(v.string()),
+    raw: v.optional(v.any()),
+    created_at: v.optional(v.string())
+  })
+    .index('by_user', ['user_id'])
+    .index('by_conversation', ['conversation_id']),
+
+  chat_integrations: defineTable({
+    integration_id: v.string(),
+    user_id: v.string(),
+    channel: v.string(),
+    signing_secret: v.string(),
+    external_team_id: v.optional(v.string()),
+    created_at: v.optional(v.string()),
+    updated_at: v.optional(v.string())
+  })
+    .index('by_integration', ['integration_id'])
+    .index('by_user', ['user_id']),
+
+  orders: defineTable({
+    order_id: v.string(),
+    user_id: v.string(),
+    plan: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.string(),
+    payment_status: v.string(),
+    customer_name: v.optional(v.string()),
+    customer_email: v.optional(v.string()),
+    customer_phone: v.optional(v.string()),
+    created_at: v.optional(v.string()),
+    updated_at: v.optional(v.string())
+  })
+    .index('by_order_id', ['order_id'])
+    .index('by_user', ['user_id']),
+
+  payments: defineTable({
+    order_id: v.string(),
+    provider: v.string(),
+    invoice_id: v.optional(v.string()),
+    transaction_id: v.optional(v.string()),
+    status: v.string(),
+    gateway_status: v.optional(v.string()),
+    amount: v.number(),
+    currency: v.string(),
+    raw_request: v.optional(v.any()),
+    raw_response: v.optional(v.any()),
+    created_at: v.optional(v.string()),
+    updated_at: v.optional(v.string())
+  })
+    .index('by_order_id', ['order_id'])
+    .index('by_invoice_id', ['invoice_id'])
 })

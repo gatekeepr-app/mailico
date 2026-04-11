@@ -48,3 +48,70 @@ yarn dev
 # or
 npm run dev
 ```
+
+## Chat webhooks (Slack)
+
+Mailico can ingest incoming Slack messages via a webhook endpoint.
+
+### Endpoint
+
+```
+POST /api/chat/webhooks/slack/:integrationId
+```
+
+### Required environment variables
+
+### Create a Slack integration
+
+```
+POST /api/chat/integrations/slack
+```
+
+Body:
+
+```
+{
+  "signingSecret": "...",
+  "teamId": "T0123ABC" // optional
+}
+```
+
+Response:
+
+```
+{
+  "ok": true,
+  "integrationId": "...",
+  "webhookUrl": "https://your-app.com/api/chat/webhooks/slack/..."
+}
+```
+
+### Required environment variables
+
+- `CREDENTIALS_SECRET` - Encryption key for stored signing secrets.
+- `CONVEX_ADMIN_SECRET` - Required for server-side ingestion into Convex.
+- `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL` - Convex endpoint for server client.
+
+### Notes
+
+- Slack URL verification is handled automatically.
+- Events are stored as chat conversations and chat messages for later automation.
+
+## Payments (UddoktaPay)
+
+Billing uses UddoktaPay for checkout and verification.
+
+### Endpoints
+
+```
+POST /api/payments/uddokta/create
+POST /api/payments/uddokta/verify
+POST /api/payments/uddokta/webhook
+```
+
+### Required environment variables
+
+- `UDDOKTAPAY_API_KEY`
+- `UDDOKTAPAY_BASE_URL` (optional, defaults to https://gatekeepr.paymently.io/api)
+- `CONVEX_ADMIN_SECRET`
+- `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL`

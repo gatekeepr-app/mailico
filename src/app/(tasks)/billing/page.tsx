@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Check, CreditCard, Download, HelpCircle, Plus } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -22,8 +23,9 @@ import { Separator } from '@/components/ui/separator'
 
 const plans = [
   {
+    id: 'free',
     name: 'Free',
-    price: '$0',
+    price: 'BDT 0',
     description: 'Perfect for side projects and testing.',
     features: [
       '3,000 emails per month',
@@ -35,10 +37,11 @@ const plans = [
     cta: 'Current Plan'
   },
   {
+    id: 'pro',
     name: 'Pro',
-    price: '$19',
+    price: 'BDT 999',
     period: '/mo',
-    description: 'For growing businesses and creators.',
+    description: 'For growing teams and scaling workflows.',
     features: [
       '50,000 emails per month',
       'Unlimited sender identities',
@@ -50,9 +53,11 @@ const plans = [
     cta: 'Upgrade to Pro'
   },
   {
-    name: 'Enterprise',
-    price: 'Custom',
-    description: 'Scale without limits and dedicated help.',
+    id: 'business',
+    name: 'Business',
+    price: 'BDT 3999',
+    period: '/mo',
+    description: 'Power users and high-volume operations.',
     features: [
       'Unlimited emails',
       'Dedicated IP',
@@ -60,7 +65,7 @@ const plans = [
       'Dedicated account manager',
       'Custom integrations'
     ],
-    cta: 'Contact Sales'
+    cta: 'Upgrade to Business'
   }
 ]
 
@@ -71,12 +76,12 @@ const invoices = [
 ]
 
 export default function BillingPage() {
-  const [billingCycle, setBillingCycle] = React.useState<'monthly' | 'yearly'>(
-    'monthly'
-  )
   const [loading, setLoading] = React.useState(true)
   const [usage, setUsage] = React.useState({ emails_sent: 0 })
   const [planName, setPlanName] = React.useState('free')
+  const [checkoutPlan, setCheckoutPlan] = React.useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const verifyRan = React.useRef(false)
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -98,15 +103,97 @@ export default function BillingPage() {
     loadData()
   }, [])
 
-  const handleUpgrade = (selectedPlan: string) => {
+  React.useEffect(() => {
+    if (verifyRan.current) return
+    const invoiceId = searchParams.get('invoice_id')
+    const orderId = searchParams.get('order_id')
+    const status = searchParams.get('status')
+
+    if (!invoiceId && !orderId && !status) return
+    verifyRan.current = true
+
+    if (status === 'cancelled') {
+      toast.error('Payment cancelled')
+      return
+    }
+
+    if (!invoiceId && !orderId) {
+      return
+    }
+
+    const verifyPayment = async () => {
+      try {
+        const response = await fetch('/api/payments/uddokta/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceId, orderId })
+        })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to verify payment')
+        }
+
+        if (payload?.success) {
+          toast.success('Payment confirmed')
+          if (payload?.order?.plan) {
+            setPlanName(payload.order.plan)
+          }
+        } else {
+          toast.error(`Payment status: ${payload?.status || 'unknown'}`)
+        }
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to verify payment')
+      }
+    }
+
+    verifyPayment()
+  }, [searchParams])
+
+  const handleUpgrade = async (selectedPlan: string) => {
     if (selectedPlan.toLowerCase() === planName.toLowerCase()) return
-    toast.success(`Redirecting to ${selectedPlan} checkout...`)
+    setCheckoutPlan(selectedPlan)
+    try {
+      const origin = window.location.origin
+      const response = await fetch('/api/payments/uddokta/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: selectedPlan.toLowerCase(),
+          redirectUrl: `${origin}/billing?status=success`,
+          cancelUrl: `${origin}/billing?status=cancelled`,
+          webhookUrl: `${origin}/api/payments/uddokta/webhook`
+        })
+      })
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to start checkout')
+      }
+
+      if (payload?.status === 'free') {
+        toast.success('Plan updated')
+        setPlanName(selectedPlan.toLowerCase())
+        return
+      }
+
+      if (payload?.payment_url) {
+        toast.success(`Redirecting to ${selectedPlan} checkout...`)
+        window.location.href = payload.payment_url
+        return
+      }
+
+      throw new Error('Missing payment_url from gateway')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to start checkout')
+    } finally {
+      setCheckoutPlan(null)
+    }
   }
 
   const LIMITS: Record<string, number> = {
     free: 3000,
     pro: 50000,
-    enterprise: 1000000
+    business: 1000000
   }
 
   const currentLimit = LIMITS[planName.toLowerCase()] || 3000
@@ -185,20 +272,7 @@ export default function BillingPage() {
       <div className='space-y-6'>
         <div className='flex items-center justify-between'>
           <h2 className='text-xl font-semibold'>Choose a Plan</h2>
-          <div className='flex items-center gap-2 rounded-full border bg-muted/50 p-1'>
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${billingCycle === 'monthly' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${billingCycle === 'yearly' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              Yearly <span className='ml-1 text-emerald-500'>-20%</span>
-            </button>
-          </div>
+          <div className='text-xs text-muted-foreground'>Monthly pricing</div>
         </div>
 
         <div className='grid grid-cols-1 gap-6 md:grid-cols-3'>
@@ -223,13 +297,7 @@ export default function BillingPage() {
                 </CardHeader>
                 <CardContent className='flex-1 space-y-4'>
                   <div className='flex-baseline flex gap-1'>
-                    <span className='text-3xl font-bold'>
-                      {billingCycle === 'yearly' &&
-                      plan.price !== 'Custom' &&
-                      plan.price !== '$0'
-                        ? `$${Math.round(parseInt(plan.price.replace(/\$/g, '')) * 0.8)}`
-                        : plan.price}
-                    </span>
+                    <span className='text-3xl font-bold'>{plan.price}</span>
                     {plan.period && (
                       <span className='text-muted-foreground'>
                         {plan.period}
@@ -249,7 +317,7 @@ export default function BillingPage() {
                 <CardFooter>
                   <Button
                     variant={
-                      plan.name.toLowerCase() === planName.toLowerCase()
+                      plan.id.toLowerCase() === planName.toLowerCase()
                         ? 'outline'
                         : plan.recommended
                           ? 'default'
@@ -257,14 +325,17 @@ export default function BillingPage() {
                     }
                     className='w-full rounded-xl'
                     disabled={
-                      plan.name.toLowerCase() === planName.toLowerCase() ||
-                      loading
+                      plan.id.toLowerCase() === planName.toLowerCase() ||
+                      loading ||
+                      checkoutPlan === plan.id
                     }
-                    onClick={() => handleUpgrade(plan.name)}
+                    onClick={() => handleUpgrade(plan.id)}
                   >
-                    {plan.name.toLowerCase() === planName.toLowerCase()
+                    {plan.id.toLowerCase() === planName.toLowerCase()
                       ? 'Current Plan'
-                      : plan.cta}
+                      : checkoutPlan === plan.id
+                        ? 'Redirecting...'
+                        : plan.cta}
                   </Button>
                 </CardFooter>
               </Card>

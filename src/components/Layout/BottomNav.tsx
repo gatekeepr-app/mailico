@@ -3,12 +3,10 @@
 import { signOut } from '@/lib/auth-api'
 import {
   CalendarClock,
-  Layers3,
   LogOut,
   Mail,
   MessageSquareText,
-  Send,
-  SlidersHorizontal
+  Send
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -17,9 +15,7 @@ const tabs = [
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { href: '/sent', label: 'Sent', icon: Send },
   { href: '/scheduled', label: 'Scheduled', icon: CalendarClock },
-  { href: '/sms', label: 'SMS', icon: MessageSquareText },
-  { href: '/automation', label: 'Automation', icon: Layers3 },
-  { href: '/control', label: 'Control', icon: SlidersHorizontal }
+  { href: '/sms', label: 'SMS', icon: MessageSquareText }
 ] as const
 
 export default function BottomNav() {

@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import ChatIntegrationsClient from '@/components/chat-integrations-client'
+
 const connectors = [
   {
     title: 'Meta tools',
@@ -56,6 +58,22 @@ export default function IntegrationsPage() {
             </p>
           </div>
         ))}
+      </section>
+
+      <section className='mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5'>
+        <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
+          <div>
+            <h2 className='text-base font-semibold text-slate-900 dark:text-white'>
+              Slack integration
+            </h2>
+            <p className='text-xs text-slate-500 dark:text-slate-400'>
+              Create a per-user webhook URL for incoming Slack messages.
+            </p>
+          </div>
+        </div>
+        <div className='mt-4'>
+          <ChatIntegrationsClient />
+        </div>
       </section>
 
       <section className='mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5'>
