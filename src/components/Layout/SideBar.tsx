@@ -6,6 +6,7 @@ import {
   CreditCard,
   Inbox,
   Layers3,
+  LogOut,
   MessageCircle,
   MessageSquareText,
   Pencil,
@@ -13,7 +14,7 @@ import {
   Send,
   SlidersHorizontal
 } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import React from 'react'
 import { NavItem } from '../Elements/NavItem'
 import { Button } from '../ui/button'
@@ -35,6 +36,7 @@ type SideBarProps = {
 
 export default function SideBar({ setComposeOpen, active }: SideBarProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   // If 'active' prop is not provided, derive it from pathname
   const currentActive =
@@ -132,6 +134,23 @@ export default function SideBar({ setComposeOpen, active }: SideBarProps) {
             href='/profile'
             active={currentActive === 'profile'}
           />
+          <div className='my-2 h-px bg-slate-200 dark:bg-white/10' />
+          <Button
+            variant='ghost'
+            className='h-10 w-full justify-start gap-2 rounded-full text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white'
+            onClick={async () => {
+              try {
+                await fetch('/api/auth/logout', { method: 'POST' })
+              } catch {
+                // ignore errors
+              }
+              router.replace('/auth')
+              router.refresh()
+            }}
+          >
+            <LogOut className='h-4 w-4' />
+            Sign out
+          </Button>
         </div>
       </div>
     </aside>

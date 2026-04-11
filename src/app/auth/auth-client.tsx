@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, Lock, Mail, User } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import * as React from 'react'
@@ -33,6 +33,7 @@ export default function AuthPage() {
 
   const [mode, setMode] = React.useState<'signin' | 'signup'>(initialMode)
   const [loading, setLoading] = React.useState(false)
+  const [showPassword, setShowPassword] = React.useState(false)
 
   const [name, setName] = React.useState('')
   const [email, setEmail] = React.useState('')
@@ -96,7 +97,7 @@ export default function AuthPage() {
       router.replace(nextPath)
       router.refresh()
     } catch (err: any) {
-      toast.error(err?.message || 'Authentication failed.')
+      toast.error(getAuthErrorMessage(err, mode))
     } finally {
       setLoading(false)
     }
@@ -230,16 +231,28 @@ export default function AuthPage() {
                 <Lock className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
                 <Input
                   id='password'
-                  type='password'
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder='••••••••'
-                  className='h-11 rounded-xl pl-9'
+                  className='h-11 rounded-xl pl-9 pr-11'
                   autoComplete={
                     mode === 'signin' ? 'current-password' : 'new-password'
                   }
                   required
                 />
+                <button
+                  type='button'
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className='absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200'
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className='h-4 w-4' />
+                  ) : (
+                    <Eye className='h-4 w-4' />
+                  )}
+                </button>
               </div>
               <div className='flex flex-col items-start justify-between'>
                 <span className='text-xs text-slate-500 dark:text-slate-400'>
@@ -301,4 +314,31 @@ export default function AuthPage() {
       </div>
     </main>
   )
+}
+
+function getAuthErrorMessage(error: unknown, mode: 'signin' | 'signup') {
+  const message =
+    typeof error === 'string' ? error : (error as { message?: string })?.message
+
+  if (!message) {
+    return mode === 'signup'
+      ? 'Unable to create account. Please try again.'
+      : 'Unable to sign in. Please try again.'
+  }
+
+  const normalized = message.toLowerCase()
+  if (normalized.includes('invalid request origin')) {
+    return 'This request was blocked by origin validation. Please refresh.'
+  }
+  if (normalized.includes('too many')) {
+    return 'Too many attempts. Please wait a minute and try again.'
+  }
+  if (normalized.includes('email and password')) {
+    return 'Please enter both email and password.'
+  }
+  if (normalized.includes('password must')) {
+    return 'Password must be 8+ chars with upper/lowercase, number, and special character.'
+  }
+
+  return message
 }
