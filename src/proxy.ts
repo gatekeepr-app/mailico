@@ -17,7 +17,7 @@ async function validateSession(sessionToken: string) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
   const isProtected =

@@ -1,11 +1,13 @@
 /** @type {import('next').NextConfig} */
 import withSerwistInit from '@serwist/next'
 
+process.env.SERWIST_SUPPRESS_TURBOPACK_WARNING = '1'
+
 const withSerwist = withSerwistInit({
   swSrc: 'src/app/sw.ts', // your SW source (TS)
   swDest: 'public/sw.js', // emitted SW path at runtime
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV === 'development' // no SW in dev
+  disable: process.env.NODE_ENV !== 'production' // no SW outside prod
 })
 
 const remoteHosts = (process.env.NEXT_IMAGE_REMOTE_HOSTS || 'i.pravatar.cc')
