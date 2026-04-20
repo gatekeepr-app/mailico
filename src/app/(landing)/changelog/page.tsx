@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import {
-  ArrowLeft,
   Bug,
   Calendar,
   CreditCard,
@@ -13,6 +12,11 @@ import {
   Zap
 } from 'lucide-react'
 import Link from 'next/link'
+
+const videoSrc =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260217_030345_246c0224-10a4-422c-b324-070b7c0eceda.mp4'
+
+const navLinks = ['Product', 'Developers', 'Pricing', 'Resources']
 
 const updates = [
   {
@@ -57,7 +61,7 @@ const updates = [
         title: 'Real-time Ingestion Graphs',
         description:
           'New real-time charts in the control panel showing email ingestion and delivery status as it happens.',
-        icon: <Zappy className='h-4 w-4' />
+        icon: <Zap className='h-4 w-4' />
       },
       {
         type: 'feature',
@@ -77,33 +81,85 @@ const updates = [
   }
 ]
 
-// Fixed icon name (Zap instead of Zappy)
-function Zappy(props: any) {
-  return <Zap {...props} />
-}
-
 export default function ChangelogPage() {
   return (
-    <div className='min-h-screen bg-background text-foreground transition-colors'>
-      {/* Header */}
-      <div className='sticky top-0 z-50 border-b border-black/5 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-black/60'>
-        <div className='mx-auto flex h-16 max-w-5xl items-center justify-between px-5'>
-          <Link href='/' className='group flex items-center gap-2'>
-            <div className='grid h-8 w-8 place-items-center rounded-lg bg-emerald-500/10 text-emerald-600 transition-colors group-hover:bg-emerald-500/20'>
-              <ArrowLeft className='h-4 w-4' />
+    <main className='min-h-screen bg-[#020202] text-white'>
+      <section className='relative isolate overflow-hidden text-white'>
+        <video
+          src={videoSrc}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className='absolute inset-0 h-full w-full object-cover'
+        />
+        <div className='absolute inset-0 bg-black/60' />
+
+        <div className='relative flex min-h-[40vh] flex-col'>
+          <header className='flex items-center justify-between px-[120px] py-[20px] max-xl:px-16 max-lg:px-12 max-md:px-6 max-md:py-4'>
+            <div className='flex flex-1 items-center gap-10 max-md:gap-4'>
+              <Link
+                href='/'
+                className='text-[20px] font-semibold tracking-[0.25em]'
+                style={{ width: 187, height: 25 }}
+              >
+                MAILICO
+              </Link>
+              <nav className='hidden items-center gap-[30px] text-[14px] font-medium md:flex'>
+                {navLinks.map(link => {
+                  const href =
+                    link === 'Pricing'
+                      ? '/pricing'
+                      : link === 'Product'
+                        ? '/'
+                        : link === 'Developers'
+                          ? '/changelog'
+                          : link === 'Resources'
+                            ? '/blog'
+                            : '/'
+                  return (
+                    <Link
+                      key={link}
+                      href={href}
+                      className='flex items-center gap-[14px] text-white transition hover:text-white/80'
+                    >
+                      <span>{link}</span>
+                    </Link>
+                  )
+                })}
+              </nav>
             </div>
-            <span className='text-sm font-medium'>Back to Home</span>
-          </Link>
-          <div className='flex items-center gap-2'>
-            <div className='h-2 w-2 animate-pulse rounded-full bg-emerald-500' />
-            <span className='text-xs font-semibold uppercase tracking-wider text-muted-foreground'>
-              Changelog Updates
-            </span>
+            <div className='flex items-center gap-3 text-sm font-medium'>
+              <Link
+                href='/auth?mode=signin'
+                className='hidden text-white/70 transition hover:text-white md:inline-flex'
+              >
+                Log in
+              </Link>
+              <Link
+                href='/auth?mode=signup'
+                className='inline-flex items-center rounded-full border border-white/70 px-5 py-2 text-white shadow-[0_15px_40px_rgba(0,0,0,0.35)] transition hover:bg-white/10'
+              >
+                Create account
+              </Link>
+            </div>
+          </header>
+
+          <div className='flex flex-1 items-center justify-center px-6 pb-[102px] pt-[140px] max-md:pb-[80px] max-md:pt-[120px]'>
+            <div className='flex w-full max-w-[820px] flex-col items-center gap-6 text-center'>
+              <h1 className='text-[48px] font-medium leading-[1.2] max-md:text-[32px]'>
+                Changelog
+              </h1>
+              <p className='max-w-[680px] text-[15px] font-normal text-white/70'>
+                Stay up to date with the latest features, improvements, and
+                fixes.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <main className='mx-auto max-w-3xl px-5 py-20'>
+      <div className='mx-auto max-w-3xl px-5 py-20'>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,12 +169,12 @@ export default function ChangelogPage() {
             Product Updates
           </Badge>
           <h1 className='text-4xl font-bold md:text-5xl'>
-            What's New in Mailico
+            What&apos;s New in Mailico
           </h1>
-          <p className='mx-auto mt-4 max-w-xl text-lg text-muted-foreground'>
-            Stay up to date with the latest features, improvements, and fixes
-            we're shipping to make Mailico the best email platform for product
-            teams.
+          <p className='mx-auto mt-4 max-w-xl text-lg text-white/60'>
+            Stay up to date with the latest features, improvements and fixes
+            we&apos;re shipping to make Mailico the best email platform for
+            product teams.
           </p>
         </motion.div>
 
@@ -132,29 +188,26 @@ export default function ChangelogPage() {
               transition={{ delay: i * 0.1 }}
               className='relative pl-8 md:pl-0'
             >
-              {/* Timeline Connector */}
-              <div className='absolute bottom-0 left-0 top-0 w-px bg-slate-200 dark:bg-white/10 md:hidden' />
+              <div className='absolute bottom-0 left-0 top-0 w-px bg-white/10 md:hidden' />
 
               <div className='grid grid-cols-1 gap-8 md:grid-cols-[160px_1fr]'>
-                {/* Side Date Info */}
                 <div className='hidden pt-1 text-right md:block'>
                   <div className='flex items-center justify-end gap-2 text-sm font-semibold text-emerald-500'>
                     <Calendar className='h-4 w-4' />
                     {update.date}
                   </div>
-                  <div className='mt-1 text-xs text-muted-foreground'>
+                  <div className='mt-1 text-xs text-white/50'>
                     {update.version}
                   </div>
                 </div>
 
-                {/* Content Card */}
-                <div className='relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-white/5 md:p-8'>
+                <div className='relative rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm transition-shadow hover:shadow-md md:p-8'>
                   <div className='mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-500 md:hidden'>
                     {update.date} • {update.version}
                   </div>
 
                   <h2 className='mb-3 text-2xl font-bold'>{update.title}</h2>
-                  <p className='mb-8 leading-relaxed text-muted-foreground'>
+                  <p className='mb-8 leading-relaxed text-white/60'>
                     {update.description}
                   </p>
 
@@ -189,7 +242,7 @@ export default function ChangelogPage() {
                               {item.type}
                             </span>
                           </div>
-                          <p className='mt-1 text-xs leading-normal text-muted-foreground'>
+                          <p className='mt-1 text-xs leading-normal text-white/50'>
                             {item.description}
                           </p>
                         </div>
@@ -202,7 +255,6 @@ export default function ChangelogPage() {
           ))}
         </div>
 
-        {/* Footer CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -221,7 +273,7 @@ export default function ChangelogPage() {
             </Button>
           </div>
         </motion.div>
-      </main>
-    </div>
+      </div>
+    </main>
   )
 }

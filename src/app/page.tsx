@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, Hexagon, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import { Hexagon, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
 
@@ -111,15 +111,28 @@ function HeroSection({ isDark }: { isDark: boolean }) {
               MAILICO
             </span>
             <nav className='hidden items-center gap-[30px] text-[14px] font-medium md:flex'>
-              {navLinks.map(link => (
-                <button
-                  key={link}
-                  className='flex items-center gap-[14px] text-white transition hover:text-white/80'
-                >
-                  <span>{link}</span>
-                  <ChevronDown className='h-[14px] w-[14px]' />
-                </button>
-              ))}
+              {navLinks.map(link => {
+                const href =
+                  link === 'Pricing'
+                    ? '/pricing'
+                    : link === 'Product'
+                      ? '/'
+                      : link === 'Developers'
+                        ? '/changelog'
+                        : link === 'Resources'
+                          ? '/blog'
+                          : '/'
+                return (
+                  <Link
+                    key={link}
+                    href={href}
+                    className='flex items-center gap-[14px] text-white transition hover:text-white/80'
+                  >
+                    <span>{link}</span>
+                    {/* <ChevronDown className='h-[14px] w-[14px]' /> */}
+                  </Link>
+                )
+              })}
             </nav>
           </div>
           <div className='flex items-center gap-3 text-sm font-medium'>
