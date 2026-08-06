@@ -1,14 +1,7 @@
 {
   "compilerOptions": {
-    "types": [
-      "@serwist/next/typings"
-    ],
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext",
-      "webworker"
-    ],
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -25,24 +18,17 @@
         "name": "next"
       }
     ],
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "target": "ES2017"
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "src/app/api/events/route.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
   ],
-  "exclude": [
-    "node_modules",
-    "public/sw.js"
-  ]
+  "exclude": ["node_modules"]
 }

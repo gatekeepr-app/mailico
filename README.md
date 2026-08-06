@@ -1,117 +1,54 @@
-# Next.js PWA Starter Kit
+# Mailico
 
-Welcome to the Next.js PWA Starter Kit! This starter kit provides a foundation for building Progressive Web Apps (PWAs) using Next.js and the `Serwist` plugin.
+A Gmail-style mail client that sends email through [Resend](https://resend.com) from any address on the `mail.darvizlabs.online` domain.
 
 ## Features
 
-- **Next.js**: The React framework for production.
-- **PWA support**: Add offline capabilities and improve the performance of your app with `Serwist`.
-- **Tailwind CSS** : A utility-first CSS framework packed with classes
-- **TypeScript**: Optional, strongly typed language that builds on JavaScript.
-- **ESLint**: Linting for JavaScript and TypeScript.
-- **Prettier**: Code formatter to ensure consistent code style.
+- Gmail-like interface: sidebar, email list, reading pane, search, starring, drafts, trash.
+- Compose with **To**, **Cc** and **Bcc** recipient fields (chip inputs, comma/Enter to add).
+- **From** field: type any local part (e.g. `john`), it always sends as `<local>@mail.darvizlabs.online`. The domain is enforced on the server — requests with any other sender domain are rejected.
+- Drafts auto-save while you compose (localStorage) and can be reopened to edit.
+- Sent emails are recorded locally so you can review them in **Sent**.
 
-## Getting Started
+## Setup
 
-To get started with this starter kit, follow these steps:
+1. Verify the `mail.darvizlabs.online` domain in [Resend](https://resend.com/domains) and add the required DNS records.
+2. Create a [Resend API key](https://resend.com/api-keys) and put it in `.env.local`:
 
-### Prerequisites
-
-Make sure you have the following installed:
-
-- [Node.js](https://nodejs.org/) (>= 20.0.0)
-- [Yarn](https://yarnpkg.com/) or [npm](https://www.npmjs.com/)
-
-### Installation
-
-1. Clone this repository:
-
-   ```sh
-   git clone https://github.com/hariadiarief/next-pwa-starter-kit.git
-   cd next-pwa-starter-kit
+   ```
+   RESEND_API_KEY=re_xxxxxxxx
    ```
 
-2. Install the dependencies:
+3. Install and run:
 
-   ```sh
-   yarn install
-   # or
+   ```bash
    npm install
+   npm run dev
    ```
 
-### Development
+4. Open http://localhost:3000, press **Compose**, pick a sender name, add recipients and send.
 
-To start the development server, run:
+## Sending API
 
-```sh
-yarn dev
-# or
-npm run dev
-```
+`POST /api/send`
 
-## Chat webhooks (Slack)
-
-Mailico can ingest incoming Slack messages via a webhook endpoint.
-
-### Endpoint
-
-```
-POST /api/chat/webhooks/slack/:integrationId
-```
-
-### Required environment variables
-
-### Create a Slack integration
-
-```
-POST /api/chat/integrations/slack
-```
-
-Body:
-
-```
+```json
 {
-  "signingSecret": "...",
-  "teamId": "T0123ABC" // optional
+  "from": "sales@mail.darvizlabs.online",
+  "to": ["customer@example.com"],
+  "cc": ["boss@example.com"],
+  "bcc": ["audit@example.com"],
+  "subject": "Hello",
+  "body": "Plain text body"
 }
 ```
 
-Response:
+Server-side rules:
 
-```
-{
-  "ok": true,
-  "integrationId": "...",
-  "webhookUrl": "https://your-app.com/api/chat/webhooks/slack/..."
-}
-```
+- `from` must end with `@mail.darvizlabs.online` (the local part is validated too).
+- At least one `to` recipient is required; recipients are basic email validated.
+- `replyTo` is set to the sender so replies land back on the custom address.
 
-### Required environment variables
+## Storage note
 
-- `CREDENTIALS_SECRET` - Encryption key for stored signing secrets.
-- `CONVEX_ADMIN_SECRET` - Required for server-side ingestion into Convex.
-- `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL` - Convex endpoint for server client.
-
-### Notes
-
-- Slack URL verification is handled automatically.
-- Events are stored as chat conversations and chat messages for later automation.
-
-## Payments (UddoktaPay)
-
-Billing uses UddoktaPay for checkout and verification.
-
-### Endpoints
-
-```
-POST /api/payments/uddokta/create
-POST /api/payments/uddokta/verify
-POST /api/payments/uddokta/webhook
-```
-
-### Required environment variables
-
-- `UDDOKTAPAY_API_KEY`
-- `UDDOKTAPAY_BASE_URL` (optional, defaults to https://gatekeepr.paymently.io/api)
-- `CONVEX_ADMIN_SECRET`
-- `CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL`
+Sent/draft/read/star state is kept in `localStorage` for this demo. Incoming mail is not fetched — Resend is used for sending only (an inbound webhook could be added later).

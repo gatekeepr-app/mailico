@@ -1,97 +1,201 @@
-import { v } from 'convex/values'
-import { mutation, query } from './_generated/server'
-import { authFields, ensureUserAuthorization, hasAdminAccess } from './identity'
+import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
+import { mutation, query } from "./_generated/server";
+import { authComponent } from "./auth";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 
-const nullableString = v.union(v.string(), v.null())
+const MAIL_DOMAIN = "mail.darvizlabs.online";
 
-export const getByUserId = query({
-  args: { userId: v.string(), ...authFields },
-  handler: async (ctx, args) => {
-    await ensureUserAuthorization(args, { allowAdmin: true })
-    return await ctx.db
-      .query('profiles')
-      .withIndex('by_user', q => q.eq('user_id', args.userId))
-      .unique()
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function normalizeAssignedEmail(localOrEmail: string) {
+  const value = localOrEmail.trim().toLowerCase();
+  const local = value.includes("@") ? value.split("@")[0] : value;
+  if (!/^[a-z0-9._-]+$/.test(local)) {
+    throw new ConvexError("Email local part can only use letters, numbers, dots, underscores, and hyphens.");
   }
-})
+  return `${local}@${MAIL_DOMAIN}`;
+}
 
-export const countByDomain = query({
-  args: { domain: v.string(), ...authFields },
-  handler: async (ctx, args) => {
-    await ensureUserAuthorization(args)
-    const normalized = args.domain.trim().toLowerCase()
-    let count = 0
+function isConfiguredAdmin(email: string) {
+  const configured = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.includes(email.toLowerCase());
+}
 
-    const iterator = ctx.db
-      .query('profiles')
-      .withIndex('by_domain', q => q.eq('domain', normalized))
+type Ctx = QueryCtx | MutationCtx;
 
-    for await (const _ of iterator) {
-      count += 1
+async function requireAuth(ctx: Ctx) {
+  const user = await authComponent.getAuthUser(ctx);
+  if (!user?._id) throw new ConvexError("Not authenticated.");
+  return user;
+}
+
+async function getProfileByAuthUserId(ctx: Ctx, authUserId: string) {
+  return await ctx.db
+    .query("userProfiles")
+    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+    .unique();
+}
+
+async function requireStaff(ctx: Ctx) {
+  const user = await requireAuth(ctx);
+  const profile = await getProfileByAuthUserId(ctx, user._id);
+  if (!profile || (profile.role !== "admin" && profile.role !== "hr")) {
+    throw new ConvexError("Admin or HR access required.");
+  }
+  return { user, profile };
+}
+
+async function requireAdmin(ctx: Ctx) {
+  const user = await requireAuth(ctx);
+  const profile = await getProfileByAuthUserId(ctx, user._id);
+  if (!profile || profile.role !== "admin") {
+    throw new ConvexError("Admin access required.");
+  }
+  return { user, profile };
+}
+
+export const ensureCurrentProfile = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAuth(ctx);
+    const existing = await getProfileByAuthUserId(ctx, user._id);
+    const now = Date.now();
+
+    if (existing) {
+      const name = user.name || user.email.split("@")[0];
+      if (existing.accountEmail !== user.email || existing.name !== name) {
+        await ctx.db.patch(existing._id, {
+          accountEmail: user.email,
+          name,
+          updatedAt: now,
+        });
+      }
+      return await ctx.db.get(existing._id);
     }
 
-    return count
-  }
-})
+    const role = isConfiguredAdmin(user.email) ? "admin" : "user";
+    const profileId = await ctx.db.insert("userProfiles", {
+      authUserId: user._id,
+      accountEmail: user.email,
+      name: user.name || user.email.split("@")[0],
+      role,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get(profileId);
+  },
+});
 
-export const save = mutation({
+export const getMyProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.safeGetAuthUser(ctx);
+    if (!user?._id) return null;
+    const profile = await getProfileByAuthUserId(ctx, user._id);
+    let department = null;
+    if (profile?.departmentId) {
+      department = await ctx.db.get(profile.departmentId);
+    }
+    return { user, profile, department };
+  },
+});
+
+export const listProfiles = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    await requireStaff(ctx);
+    const [profilePage, departments] = await Promise.all([
+      ctx.db
+        .query("userProfiles")
+        .withIndex("by_updatedAt")
+        .order("desc")
+        .paginate(args.paginationOpts),
+      ctx.db.query("departments").take(200),
+    ]);
+    const departmentsById = new Map(departments.map((d) => [d._id, d]));
+    return {
+      ...profilePage,
+      page: profilePage.page.map((profile) => ({
+        ...profile,
+        department: profile.departmentId
+          ? departmentsById.get(profile.departmentId) ?? null
+          : null,
+      })),
+    };
+  },
+});
+
+export const listDepartments = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireStaff(ctx);
+    return await ctx.db.query("departments").take(200);
+  },
+});
+
+export const createDepartment = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    await requireStaff(ctx);
+    const name = args.name.trim();
+    const slug = slugify(name);
+    if (!name || !slug) throw new ConvexError("Department name is required.");
+    const existing = await ctx.db
+      .query("departments")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (existing) return existing._id;
+    return await ctx.db.insert("departments", {
+      name,
+      slug,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const updateProfileAssignment = mutation({
   args: {
-    userId: v.string(),
-    ...authFields,
-    profile: v.object({
-      email: v.optional(nullableString),
-      name: v.optional(nullableString),
-      domain: v.optional(nullableString),
-      phone: v.optional(nullableString),
-      country: v.optional(nullableString),
-      avatar: v.optional(nullableString),
-      resend_api_key: v.optional(nullableString),
-      sms_user: v.optional(nullableString),
-      sms_password: v.optional(nullableString),
-      sms_creds_updated_at: v.optional(nullableString),
-      sms_sender_name: v.optional(nullableString),
-      sms_sender_type: v.optional(nullableString),
-      sms_balance_checked_at: v.optional(nullableString),
-      plan: v.optional(nullableString),
-      plan_name: v.optional(nullableString),
-      webhook_secret: v.optional(nullableString)
-    })
+    profileId: v.id("userProfiles"),
+    role: v.union(v.literal("admin"), v.literal("hr"), v.literal("user")),
+    departmentId: v.optional(v.id("departments")),
+    assignedEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const isAdmin = hasAdminAccess(args.adminSecret)
-    await ensureUserAuthorization(args, { allowAdmin: true })
-    const now = new Date().toISOString()
-    const sanitizedProfile: Record<string, string | undefined> = {}
-    const restrictedKeys = new Set(['plan', 'plan_name', 'webhook_secret'])
+    const { profile: actor } =
+      args.role === "admin" ? await requireAdmin(ctx) : await requireStaff(ctx);
+    const target = await ctx.db.get(args.profileId);
+    if (!target) throw new ConvexError("User profile not found.");
+    if (actor.role === "hr" && (target.role === "admin" || args.role === "admin")) {
+      throw new ConvexError("HR cannot assign or modify admin access.");
+    }
 
-    for (const key of Object.keys(args.profile) as Array<
-      keyof typeof args.profile
-    >) {
-      if (!isAdmin && restrictedKeys.has(key)) {
-        continue
+    let assignedEmail: string | undefined;
+    if (args.assignedEmail?.trim()) {
+      assignedEmail = normalizeAssignedEmail(args.assignedEmail);
+      const existing = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", assignedEmail))
+        .unique();
+      if (existing && existing._id !== args.profileId) {
+        throw new ConvexError("That company email is already assigned.");
       }
-      const value = args.profile[key]
-      sanitizedProfile[key] =
-        value === null || value === undefined ? undefined : value
     }
 
-    const existing = await ctx.db
-      .query('profiles')
-      .withIndex('by_user', q => q.eq('user_id', args.userId))
-      .unique()
-
-    const nextProfile = {
-      user_id: args.userId,
-      created_at: existing?.created_at ?? now,
-      updated_at: now,
-      ...sanitizedProfile
-    }
-
-    if (existing?._id) {
-      await ctx.db.patch(existing._id, nextProfile)
-      return existing._id
-    }
-
-    return await ctx.db.insert('profiles', nextProfile)
-  }
-})
+    await ctx.db.patch(args.profileId, {
+      role: args.role,
+      departmentId: args.departmentId,
+      assignedEmail,
+      updatedAt: Date.now(),
+    });
+  },
+});
