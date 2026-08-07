@@ -1,6 +1,7 @@
 "use client";
 
 import { Star, Trash2, Pencil, ArrowLeft } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
 import { formatAddresses } from "@/lib/mail";
 import type { Email } from "@/lib/types";
 
@@ -86,9 +87,7 @@ export default function EmailView({
         </h1>
 
         <div className="mt-5 flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0b57d0] text-sm font-medium text-white">
-            {(email.from[0] ?? "?").toUpperCase()}
-          </div>
+          <Avatar name={email.from} size="lg" />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-gray-900">{email.from}</p>
             <p className="text-xs text-gray-500">

@@ -18,6 +18,7 @@ import {
   uid,
 } from "@/lib/mail";
 import { authClient } from "@/lib/auth-client";
+import { canAccessAdminPage } from "@/lib/admin";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
@@ -348,9 +349,7 @@ export default function MailApp() {
         onGoInbox={() => navigate("inbox")}
         userEmail={userEmail}
         userName={userName}
-        isStaff={
-          profileData?.profile?.role === "admin" || profileData?.profile?.role === "hr"
-        }
+        isStaff={canAccessAdminPage(userEmail, profileData?.profile?.role)}
         onSignOut={handleSignOut}
       />
 

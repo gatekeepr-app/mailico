@@ -7,26 +7,59 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
 - Gmail-like interface: sidebar, email list, reading pane, search, starring, drafts, trash.
 - Compose with **To**, **Cc** and **Bcc** recipient fields (chip inputs, comma/Enter to add).
 - **From** field: type any local part (e.g. `john`), it always sends as `<local>@mail.darvizlabs.online`. The domain is enforced on the server — requests with any other sender domain are rejected.
+- Deterministic fallback avatars use stable name-derived initials and HSL gradients when no profile photo is available.
 - Drafts auto-save while you compose (localStorage) and can be reopened to edit.
 - Sent emails are recorded locally so you can review them in **Sent**.
 
 ## Setup
 
 1. Verify the `mail.darvizlabs.online` domain in [Resend](https://resend.com/domains) and add the required DNS records.
-2. Create a [Resend API key](https://resend.com/api-keys) and put it in `.env.local`:
+2. Create a [Resend API key](https://resend.com/api-keys).
+3. Configure local Next.js env in `.env.local`:
 
    ```
+   NEXT_PUBLIC_CONVEX_URL=https://your-dev-deployment.convex.cloud
+   NEXT_PUBLIC_CONVEX_SITE_URL=https://your-dev-deployment.convex.site
    RESEND_API_KEY=re_xxxxxxxx
    ```
 
-3. Install and run:
+4. Configure Convex env for auth and server-side email:
+
+   ```bash
+   npx convex env set SITE_URL http://localhost:3000
+   npx convex env set BETTER_AUTH_SECRET "your-32-byte-or-longer-secret"
+   npx convex env set RESEND_API_KEY "re_xxxxxxxx"
+   ```
+
+   `SITE_URL` and `BETTER_AUTH_SECRET` must be set in Convex because `convex/auth.ts` runs in Convex, not in Vercel or the local Next.js process.
+
+5. Install and run:
 
    ```bash
    npm install
    npm run dev
    ```
 
-4. Open http://localhost:3000, press **Compose**, pick a sender name, add recipients and send.
+6. Open http://localhost:3000, sign in/register, then use `/mail`.
+
+## Production Env
+
+Vercel needs the public Convex URLs:
+
+```env
+NEXT_PUBLIC_CONVEX_URL=...
+NEXT_PUBLIC_CONVEX_SITE_URL=...
+```
+
+Convex production needs the auth and server-side secrets:
+
+```bash
+npx convex env set SITE_URL https://mailico.darvizlabs.online --prod
+npx convex env set BETTER_AUTH_SECRET "your-production-secret" --prod
+npx convex env set RESEND_API_KEY "re_xxxxxxxx" --prod
+```
+
+If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing keys, clear the stale `jwks` rows in the Better Auth Convex component or restore the original secret. Otherwise `/api/auth/convex/token` can fail with `Failed to decrypt private key`.
 
 ## Sending API
 

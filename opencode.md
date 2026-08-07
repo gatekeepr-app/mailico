@@ -96,3 +96,37 @@ This file captures implementation context for future OpenCode sessions. It inten
 - Avoided unnecessary profile writes on every `/mail` mount when profile fields are unchanged.
 - Added admin mutation error toasts for department/profile updates.
 - Escaped reset-password email HTML interpolation.
+
+## 2026-08-07 - Avatars and Auth Env Recovery
+
+- Added deterministic fallback avatar utilities in `lib/avatar.ts`.
+- Added shared `components/ui/avatar.tsx` with image-first rendering, failed-image fallback, circular sizing, white initials, and stable HSL gradients.
+- Replaced manual fallback initials in `TopBar`, `EmailView`, and `AdminPanel` with the shared Avatar component.
+- Added Better Auth `trustedOrigins` in `convex/auth.ts` for the live domain, localhost, loopback, `SITE_URL`, and optional `TRUSTED_ORIGINS`.
+- Clarified that `convex/auth.ts` reads Convex env, not Vercel env or `.env.local`.
+- Diagnosed `/api/auth/convex/token` 500 as a Better Auth JWKS decrypt failure after `BETTER_AUTH_SECRET` changed.
+- Cleared one stale `jwks` row from the mounted Better Auth Convex component; unauthenticated `/api/auth/convex/token` now returns `401 Unauthorized` instead of `500`.
+- Verification passed with targeted ESLint and `npm run build`.
+
+## 2026-08-07 - Admin Access Rules
+
+- Set `contact.gatekeepr@gmail.com` as the only true admin account.
+- Kept `role` and `departmentId` fields in Convex user profiles.
+- Added `chief` and `hrLead` role support while preserving legacy `hr` values.
+- Allowed `chief` and `hrLead` to access `/admin`.
+- Allowed `chief` to assign non-admin roles, departments, and company email addresses.
+- Allowed `hrLead`/legacy `hr` to assign departments and company email addresses, but not change roles.
+
+## 2026-08-07 - Admin Table Layout
+
+- Refactored `/admin` into a two-column management layout.
+- Kept the Departments card in the left rail and added a list of existing departments.
+- Changed employee management from stacked cards to a table format.
+- Added shadcn-style `components/ui/table.tsx` and `components/ui/select.tsx` primitives.
+- Replaced native role/department selects with shadcn Select and `SelectItem` controls.
+
+## 2026-08-07 - Minimal Home Route
+
+- Replaced the `/` placeholder with a minimal public Mailico landing page.
+- Added a restrained editorial layout with sign-in, workspace, and manual entry points.
+- Kept authenticated product routes separate at `/mail` and `/admin`.

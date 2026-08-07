@@ -5,6 +5,8 @@ import { authComponent } from "./auth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const MAIL_DOMAIN = "mail.darvizlabs.online";
+const ADMIN_EMAIL = "contact.gatekeepr@gmail.com";
+const ADMIN_PAGE_ROLES = new Set(["admin", "chief", "hrLead", "hr"]);
 
 function slugify(value: string) {
   return value
@@ -23,12 +25,12 @@ function normalizeAssignedEmail(localOrEmail: string) {
   return `${local}@${MAIL_DOMAIN}`;
 }
 
-function isConfiguredAdmin(email: string) {
-  const configured = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return configured.includes(email.toLowerCase());
+function isAdminEmail(email: string) {
+  return email.trim().toLowerCase() === ADMIN_EMAIL;
+}
+
+function canAccessAdminPage(email: string, role: string | undefined) {
+  return isAdminEmail(email) || (role ? ADMIN_PAGE_ROLES.has(role) : false);
 }
 
 type Ctx = QueryCtx | MutationCtx;
@@ -49,17 +51,8 @@ async function getProfileByAuthUserId(ctx: Ctx, authUserId: string) {
 async function requireStaff(ctx: Ctx) {
   const user = await requireAuth(ctx);
   const profile = await getProfileByAuthUserId(ctx, user._id);
-  if (!profile || (profile.role !== "admin" && profile.role !== "hr")) {
-    throw new ConvexError("Admin or HR access required.");
-  }
-  return { user, profile };
-}
-
-async function requireAdmin(ctx: Ctx) {
-  const user = await requireAuth(ctx);
-  const profile = await getProfileByAuthUserId(ctx, user._id);
-  if (!profile || profile.role !== "admin") {
-    throw new ConvexError("Admin access required.");
+  if (!canAccessAdminPage(user.email, profile?.role)) {
+    throw new ConvexError("Admin, chief, or HR lead access required.");
   }
   return { user, profile };
 }
@@ -73,17 +66,23 @@ export const ensureCurrentProfile = mutation({
 
     if (existing) {
       const name = user.name || user.email.split("@")[0];
-      if (existing.accountEmail !== user.email || existing.name !== name) {
+      const role = isAdminEmail(user.email) ? "admin" : existing.role === "admin" ? "user" : existing.role;
+      if (
+        existing.accountEmail !== user.email ||
+        existing.name !== name ||
+        existing.role !== role
+      ) {
         await ctx.db.patch(existing._id, {
           accountEmail: user.email,
           name,
+          role,
           updatedAt: now,
         });
       }
       return await ctx.db.get(existing._id);
     }
 
-    const role = isConfiguredAdmin(user.email) ? "admin" : "user";
+    const role = isAdminEmail(user.email) ? "admin" : "user";
     const profileId = await ctx.db.insert("userProfiles", {
       authUserId: user._id,
       accountEmail: user.email,
@@ -166,17 +165,35 @@ export const createDepartment = mutation({
 export const updateProfileAssignment = mutation({
   args: {
     profileId: v.id("userProfiles"),
-    role: v.union(v.literal("admin"), v.literal("hr"), v.literal("user")),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("chief"),
+      v.literal("hrLead"),
+      v.literal("hr"),
+      v.literal("user"),
+    ),
     departmentId: v.optional(v.id("departments")),
     assignedEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { profile: actor } =
-      args.role === "admin" ? await requireAdmin(ctx) : await requireStaff(ctx);
+    const { user, profile: actor } = await requireStaff(ctx);
     const target = await ctx.db.get(args.profileId);
     if (!target) throw new ConvexError("User profile not found.");
-    if (actor.role === "hr" && (target.role === "admin" || args.role === "admin")) {
-      throw new ConvexError("HR cannot assign or modify admin access.");
+    const targetIsAdminAccount = isAdminEmail(target.accountEmail);
+    const actorIsAdmin = isAdminEmail(user.email);
+    const actorRole = actorIsAdmin ? "admin" : actor?.role;
+
+    if (!actorIsAdmin && targetIsAdminAccount) {
+      throw new ConvexError("Only the configured admin can modify the admin account.");
+    }
+    if (args.role === "admin" && !targetIsAdminAccount) {
+      throw new ConvexError("Only contact.gatekeepr@gmail.com can be admin.");
+    }
+    if (targetIsAdminAccount && args.role !== "admin") {
+      throw new ConvexError("The configured admin account cannot be demoted.");
+    }
+    if ((actorRole === "hr" || actorRole === "hrLead") && args.role !== target.role) {
+      throw new ConvexError("HR lead cannot change roles.");
     }
 
     let assignedEmail: string | undefined;

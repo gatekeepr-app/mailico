@@ -19,12 +19,30 @@ Mailico is an internal email tool for departments and employees. It sends email 
 - Password reset is enabled through Better Auth and sends reset links with Resend from `auth@mail.darvizlabs.online`.
 - Convex deployment: `dev:terrific-hyena-970` for project `mailico`.
 - The first app profile created becomes `admin`; later users default to `user`.
+- Better Auth trusted origins are configured in `convex/auth.ts` for `SITE_URL`, `https://mailico.darvizlabs.online`, `http://localhost:3000`, `http://127.0.0.1:3000`, and optional comma-separated `TRUSTED_ORIGINS`.
+- `contact.gatekeepr@gmail.com` is the only true admin account. `chief` and `hrLead` roles can access `/admin` with constrained permissions.
+- If `BETTER_AUTH_SECRET` is changed after JWKS keys exist, the Better Auth component `jwks` table must be cleared or the original secret restored.
+
+## Avatars
+
+- Shared avatar logic lives in `lib/avatar.ts` and `components/ui/avatar.tsx`.
+- Fallback avatars are deterministic: the user's trimmed name generates a stable hue and up to two uppercase initials.
+- Do not store avatar colors in Convex; the same name must produce the same gradient on server and client.
+- Uploaded/profile images should be preserved when available, with deterministic gradient fallback on missing or failed image URLs.
 
 ## Roles
 
-- `admin`: universal access, can manage all users, roles, departments, email assignments, and view all messages.
-- `hr`: can manage basic employee assignments and assign company email addresses, but cannot grant or modify admin access.
+- `admin`: reserved for `contact.gatekeepr@gmail.com`; universal access, can manage all users, roles, departments, email assignments, and view all messages.
+- `chief`: can access `/admin`, assign non-admin roles, assign departments, and assign company email addresses.
+- `hrLead`: can access `/admin`, assign departments, and assign company email addresses, but cannot change roles.
+- `hr`: legacy stored role treated like `hrLead` for compatibility.
 - `user`: can only send from their assigned company email and view messages they sent or that were addressed to their assigned email.
+
+## Admin UI
+
+- `/admin` uses a left Departments card that creates departments and lists existing departments.
+- Employee management is rendered as a table with shadcn-style Table and Select primitives.
+- Role and department edits are row-level forms; company email local parts still send as `@mail.darvizlabs.online`.
 
 ## Department Basics
 
@@ -53,6 +71,9 @@ Mailico is an internal email tool for departments and employees. It sends email 
 
 ## Environment
 
-- `RESEND_API_KEY` is local-only and must not be committed.
-- `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL` are required locally.
-- Convex env vars include `BETTER_AUTH_SECRET` and `SITE_URL`.
+- `.env.local` / Vercel env applies to the Next.js runtime only.
+- Convex env applies to files under `convex/`, including `convex/auth.ts`.
+- `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL` are required in local/Vercel env for the browser and Next adapter.
+- Convex env vars include `SITE_URL`, `BETTER_AUTH_SECRET`, and `RESEND_API_KEY`.
+- `SITE_URL` is the canonical URL for the current Convex environment: `http://localhost:3000` for local dev or `https://mailico.darvizlabs.online` for production.
+- `BETTER_AUTH_SECRET` must be a strong non-public secret and must not be prefixed with `NEXT_PUBLIC_`.

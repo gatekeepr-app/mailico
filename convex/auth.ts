@@ -7,6 +7,23 @@ import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 
 const MAIL_DOMAIN = "mail.darvizlabs.online";
+const LIVE_SITE_URL = "https://mailico.darvizlabs.online";
+const LOCAL_SITE_URLS = ["http://localhost:3000", "http://127.0.0.1:3000"];
+
+function getTrustedOrigins() {
+  return Array.from(
+    new Set(
+      [
+        process.env.SITE_URL,
+        LIVE_SITE_URL,
+        ...LOCAL_SITE_URLS,
+        ...(process.env.TRUSTED_ORIGINS ?? "")
+          .split(",")
+          .map((origin) => origin.trim()),
+      ].filter((origin): origin is string => Boolean(origin)),
+    ),
+  );
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -66,6 +83,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     appName: "Mailico",
     baseURL: process.env.SITE_URL,
     secret: process.env.BETTER_AUTH_SECRET,
+    trustedOrigins: getTrustedOrigins(),
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,

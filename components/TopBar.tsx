@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Menu, Search, Mail, RefreshCw, LogOut } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
 
 interface TopBarProps {
   search: string;
@@ -26,7 +27,7 @@ export default function TopBar({
   isStaff,
   onSignOut,
 }: TopBarProps) {
-  const initial = (userName ?? userEmail ?? "?")[0]?.toUpperCase() ?? "?";
+  const avatarName = userName ?? userEmail;
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-2 md:px-4">
@@ -79,12 +80,7 @@ export default function TopBar({
 
       {userEmail && (
         <div className="flex items-center gap-2">
-          <div
-            className="hidden h-9 w-9 items-center justify-center rounded-full bg-[#0b57d0] text-sm font-medium text-white sm:flex"
-            title={userEmail}
-          >
-            {initial}
-          </div>
+          <Avatar name={avatarName} size="md" className="hidden sm:flex" />
           <button
             onClick={onSignOut}
             aria-label="Sign out"
