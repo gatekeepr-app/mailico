@@ -40,8 +40,10 @@ function normalizeEmails(value: unknown): string[] | null {
 }
 
 function formatFrom(name: string, email: string): string {
-  const safeName = name.replace(/[<>\"]/g, "").trim();
-  return safeName ? `${safeName} <${email}>` : email;
+  const safeName = name.replace(/[<>]/g, "").trim();
+  if (!safeName || safeName.toLowerCase() === email.toLowerCase()) return email;
+  const escapedName = safeName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escapedName}" <${email}>`;
 }
 
 export async function POST(req: NextRequest) {
@@ -128,7 +130,7 @@ export async function POST(req: NextRequest) {
       idempotencyKey,
     });
     if (existing) {
-      return Response.json({ id: existing.resendId, from: assignedEmail, to, cc, bcc, subject });
+      return Response.json({ id: existing.resendId, from: assignedEmail, fromName: profile?.name, to, cc, bcc, subject });
     }
 
     const from = formatFrom(
@@ -181,7 +183,7 @@ export async function POST(req: NextRequest) {
       body: bodyText,
     });
 
-    return Response.json({ id: result?.id, from: assignedEmail, to, cc, bcc, subject });
+    return Response.json({ id: result?.id, from: assignedEmail, fromName: profile?.name, to, cc, bcc, subject });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unexpected error while sending.";

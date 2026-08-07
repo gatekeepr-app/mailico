@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /login
+Disallow: /mail
+Disallow: /register
+Disallow: /reset-password/
+
+Sitemap: https://mailico.darvizlabs.online/sitemap.xml
+Host: https://mailico.darvizlabs.online

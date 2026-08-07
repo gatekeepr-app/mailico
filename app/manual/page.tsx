@@ -14,7 +14,7 @@ const sections = [
   {
     title: "Roles",
     items: [
-      "Admin has universal access and can manage roles, departments, employee addresses, and all visible messages.",
+      "Admin can manage roles, departments, and employee addresses.",
       "HR can create departments and assign employee email addresses, but HR cannot grant or modify admin access.",
       "User can send from their assigned company email and only see messages they sent or that were addressed to them.",
     ],
@@ -42,9 +42,8 @@ const sections = [
   {
     title: "Viewing mail",
     items: [
-      "Users see messages they sent and messages addressed to their assigned company email.",
-      "Admin sees all messages.",
-      "Drafts are local to the browser for now.",
+      "Users see messages they sent and messages addressed to their account email or assigned company email.",
+      "Drafts auto-save to Convex and follow the signed-in account.",
       "Read/star/trash state is not yet persisted in Convex.",
     ],
   },

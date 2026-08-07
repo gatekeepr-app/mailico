@@ -55,8 +55,10 @@ Mailico is an internal email tool for departments and employees. It sends email 
 - Users cannot edit their From email manually.
 - Sending should use the account creation name as the display name.
 - A user must have an assigned company email before sending.
-- Users only see messages they sent or messages received at their assigned company email.
-- Admin sees all messages.
+- Users only see messages they sent or messages received at their account email or assigned company email.
+- Admin page access does not grant universal inbox visibility.
+- Sent, received, and draft messages are persisted in Convex.
+- Inbound messages can be recorded through `POST /api/receive`; configure `RECEIVE_WEBHOOK_SECRET` to require the `x-mailico-secret` header.
 
 ## Stack
 

@@ -2,7 +2,7 @@
 
 import { Star, Trash2, Pencil, ArrowLeft } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { formatAddresses } from "@/lib/mail";
+import { formatAddresses, formatMailboxAddress } from "@/lib/mail";
 import type { Email } from "@/lib/types";
 
 interface EmailViewProps {
@@ -87,9 +87,11 @@ export default function EmailView({
         </h1>
 
         <div className="mt-5 flex items-start gap-3">
-          <Avatar name={email.from} size="lg" />
+          <Avatar name={email.fromName || email.from} size="lg" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-gray-900">{email.from}</p>
+            <p className="text-sm text-gray-900">
+              {formatMailboxAddress(email.from, email.fromName)}
+            </p>
             <p className="text-xs text-gray-500">
               To: {formatAddresses(email.to) || "—"}
               {email.cc.length > 0 && <> · Cc: {formatAddresses(email.cc)}</>}

@@ -29,6 +29,19 @@ export function formatAddresses(addresses: string[]): string {
   return addresses.join(", ");
 }
 
+export function formatMailboxName(email: string, name?: string): string {
+  const cleanName = name?.trim();
+  if (cleanName && cleanName.toLowerCase() !== email.toLowerCase()) return cleanName;
+  const local = email.split("@")[0] || email;
+  return local.replace(/[._-]+/g, " ");
+}
+
+export function formatMailboxAddress(email: string, name?: string): string {
+  const cleanName = name?.trim();
+  if (!cleanName || cleanName.toLowerCase() === email.toLowerCase()) return email;
+  return `${cleanName} <${email}>`;
+}
+
 export function snippet(body: string, max = 160): string {
   const singleLine = body.replace(/\s+/g, " ").trim();
   return singleLine.length > max ? `${singleLine.slice(0, max)}…` : singleLine;

@@ -26,6 +26,10 @@ function adminKey() {
   return "admin:all";
 }
 
+function inboxOwnerEmails(profile: Doc<"userProfiles">) {
+  return uniqueLowercase([profile.accountEmail, profile.assignedEmail ?? ""]);
+}
+
 function uniqueLowercase(values: string[]) {
   return [...new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))];
 }
@@ -43,12 +47,14 @@ async function requireVisibleMessage(
   const message = await ctx.db.get(messageId);
   if (!message) throw new ConvexError("Message not found.");
   if (profile.role === "admin" || message.senderUserId === user._id) return message;
-  if (!profile.assignedEmail) throw new ConvexError("Message not found.");
+  const ownerKeys = inboxOwnerEmails(profile).map(emailKey);
 
   const entry = await ctx.db
     .query("mailboxEntries")
     .withIndex("by_message", (q) => q.eq("messageId", messageId))
-    .filter((q) => q.eq(q.field("ownerKey"), emailKey(profile.assignedEmail!)))
+    .filter((q) =>
+      q.or(...ownerKeys.map((ownerKey) => q.eq(q.field("ownerKey"), ownerKey))),
+    )
     .first();
   if (!entry) throw new ConvexError("Message not found.");
   return message;
@@ -67,22 +73,44 @@ export const listMailboxEntries = query({
     const profile = await getProfile(ctx, user._id);
     if (!profile) return { page: [], isDone: true, continueCursor: "" };
 
-    if (profile.role === "admin" && args.folder === "inbox") {
-      return await ctx.db
-        .query("mailboxEntries")
-        .withIndex("by_owner_folder_createdAt", (q) =>
-          q.eq("ownerKey", adminKey()).eq("folder", "inbox"),
-        )
-        .order("desc")
-        .paginate(args.paginationOpts);
-    }
+    const ownerKey = args.folder === "sent" ? userKey(user._id) : null;
 
-    const ownerKey =
-      args.folder === "sent"
-        ? userKey(user._id)
-        : profile.assignedEmail
-          ? emailKey(profile.assignedEmail)
-          : null;
+    if (args.folder === "inbox") {
+      const offset = args.paginationOpts.cursor
+        ? Number.parseInt(args.paginationOpts.cursor, 10)
+        : 0;
+      const start = Number.isFinite(offset) ? offset : 0;
+      const ownerKeys = inboxOwnerEmails(profile).map(emailKey);
+      const pages = await Promise.all(
+        ownerKeys.map((key) =>
+          ctx.db
+            .query("mailboxEntries")
+            .withIndex("by_owner_folder_createdAt", (q) =>
+              q.eq("ownerKey", key).eq("folder", "inbox"),
+            )
+            .order("desc")
+            .take(start + args.paginationOpts.numItems + 1),
+        ),
+      );
+      const seen = new Set<string>();
+      const merged = pages
+        .flat()
+        .filter((entry) => {
+          const key = String(entry.messageId);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((a, b) => b.createdAt - a.createdAt);
+      const page = merged.slice(start, start + args.paginationOpts.numItems);
+      const nextOffset = start + page.length;
+
+      return {
+        page,
+        isDone: nextOffset >= merged.length,
+        continueCursor: String(nextOffset),
+      };
+    }
 
     if (!ownerKey) return { page: [], isDone: true, continueCursor: "" };
 
@@ -209,5 +237,158 @@ export const recordSentMessage = mutation({
     }
 
     return messageId;
+  },
+});
+
+export const recordInboundMessage = mutation({
+  args: {
+    resendId: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+    fromEmail: v.string(),
+    fromName: v.optional(v.string()),
+    to: v.array(v.string()),
+    cc: v.array(v.string()),
+    bcc: v.array(v.string()),
+    subject: v.string(),
+    body: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (args.idempotencyKey) {
+      const existing = await ctx.db
+        .query("messages")
+        .withIndex("by_idempotencyKey", (q) => q.eq("idempotencyKey", args.idempotencyKey!))
+        .unique();
+      if (existing) return existing._id;
+    }
+
+    const now = Date.now();
+    const fromEmail = args.fromEmail.trim().toLowerCase();
+    const fromName = args.fromName?.trim() || fromEmail;
+    const to = uniqueLowercase(args.to);
+    const cc = uniqueLowercase(args.cc);
+    const bcc = uniqueLowercase(args.bcc);
+    const subject = args.subject.trim() || "(no subject)";
+    const bodyPreview = preview(args.body);
+
+    const messageId = await ctx.db.insert("messages", {
+      resendId: args.resendId,
+      idempotencyKey: args.idempotencyKey,
+      senderUserId: "inbound",
+      fromEmail,
+      fromName,
+      to,
+      cc,
+      bcc,
+      subject,
+      body: args.body,
+      status: "received",
+      createdAt: now,
+    });
+
+    const listFields = {
+      messageId,
+      fromEmail,
+      fromName,
+      to,
+      cc,
+      subject,
+      bodyPreview,
+      createdAt: now,
+    };
+
+    await ctx.db.insert("mailboxEntries", {
+      ownerKey: adminKey(),
+      folder: "inbox",
+      ...listFields,
+    });
+
+    for (const [kind, recipients] of [
+      ["to", to],
+      ["cc", cc],
+      ["bcc", bcc],
+    ] as const) {
+      for (const email of recipients) {
+        await ctx.db.insert("mailboxEntries", {
+          ownerKey: emailKey(email),
+          folder: "inbox",
+          recipientKind: kind,
+          ...listFields,
+        });
+      }
+    }
+
+    return messageId;
+  },
+});
+
+export const listDrafts = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.safeGetAuthUser(ctx);
+    if (!user?._id) return [];
+
+    return await ctx.db
+      .query("drafts")
+      .withIndex("by_owner_updatedAt", (q) => q.eq("ownerUserId", user._id))
+      .order("desc")
+      .take(100);
+  },
+});
+
+export const upsertDraft = mutation({
+  args: {
+    draftKey: v.string(),
+    fromEmail: v.string(),
+    to: v.array(v.string()),
+    cc: v.array(v.string()),
+    bcc: v.array(v.string()),
+    subject: v.string(),
+    body: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("drafts")
+      .withIndex("by_owner_draftKey", (q) =>
+        q.eq("ownerUserId", user._id).eq("draftKey", args.draftKey),
+      )
+      .unique();
+
+    const patch = {
+      fromEmail: args.fromEmail,
+      to: uniqueLowercase(args.to),
+      cc: uniqueLowercase(args.cc),
+      bcc: uniqueLowercase(args.bcc),
+      subject: args.subject,
+      body: args.body,
+      updatedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+      return existing._id;
+    }
+
+    return await ctx.db.insert("drafts", {
+      draftKey: args.draftKey,
+      ownerUserId: user._id,
+      createdAt: now,
+      ...patch,
+    });
+  },
+});
+
+export const deleteDraft = mutation({
+  args: { draftKey: v.string() },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    const existing = await ctx.db
+      .query("drafts")
+      .withIndex("by_owner_draftKey", (q) =>
+        q.eq("ownerUserId", user._id).eq("draftKey", args.draftKey),
+      )
+      .unique();
+    if (existing) await ctx.db.delete(existing._id);
   },
 });

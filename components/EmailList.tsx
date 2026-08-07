@@ -1,7 +1,7 @@
 "use client";
 
 import { Star, Trash2, FileText, Archive } from "lucide-react";
-import { formatTimestamp, snippet } from "@/lib/mail";
+import { formatMailboxName, formatTimestamp, snippet } from "@/lib/mail";
 import type { Email, FolderKey } from "@/lib/types";
 
 interface EmailListProps {
@@ -20,8 +20,7 @@ function displayName(email: Email): string {
   if (email.folder === "sent" || email.folder === "drafts") {
     return email.to.join(", ") || "No recipients";
   }
-  const local = email.from.split("@")[0] ?? email.from;
-  return local.replace(/[._-]+/g, " ");
+  return formatMailboxName(email.from, email.fromName);
 }
 
 export default function EmailList({

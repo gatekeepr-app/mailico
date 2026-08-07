@@ -1,0 +1,25 @@
+# Mailico
+
+> Private company mail operations workspace for Darviz Labs.
+
+Mailico is an authenticated internal mail client for assigned company sender addresses on `mail.darvizlabs.online`. It provides a Gmail-style workspace, Convex-backed mail storage, Resend sending and inbound receiving, role-based administration, departments, deterministic avatars, and draft persistence.
+
+## Public URLs
+
+- [Home](https://mailico.darvizlabs.online/): Product overview and entry point.
+- [Manual](https://mailico.darvizlabs.online/manual): User guide for admins, HR leads, chiefs, and employees.
+- [Changelog](https://mailico.darvizlabs.online/changelog): Project changelog rendered from repository notes.
+
+## Private URLs
+
+- `/mail`: Authenticated mailbox workspace.
+- `/admin`: Staff-only role, department, and company email assignment console.
+- `/login`, `/register`, `/reset-password/[token]`: Authentication and account recovery routes.
+- `/api/send`, `/api/receive`, `/api/auth/[...all]`: Server API routes.
+
+## System Notes
+
+- Sending uses Resend and the authenticated user's assigned company email.
+- Inbound mail is accepted through the Resend `email.received` webhook at `/api/receive`.
+- Mail, drafts, departments, and user profiles are stored in Convex.
+- Only authorized internal users should access authenticated mailbox and admin routes.

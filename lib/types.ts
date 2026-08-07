@@ -5,6 +5,7 @@ export type FolderKey = "inbox" | "starred" | "sent" | "drafts" | "trash";
 export interface Email {
   id: string;
   from: string;
+  fromName?: string;
   to: string[];
   cc: string[];
   bcc: string[];

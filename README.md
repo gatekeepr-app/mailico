@@ -6,10 +6,10 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
 
 - Gmail-like interface: sidebar, email list, reading pane, search, starring, drafts, trash.
 - Compose with **To**, **Cc** and **Bcc** recipient fields (chip inputs, comma/Enter to add).
-- **From** field: type any local part (e.g. `john`), it always sends as `<local>@mail.darvizlabs.online`. The domain is enforced on the server — requests with any other sender domain are rejected.
+- **From** field: uses the sender display name and company email assigned by Admin or HR. The domain is enforced on the server — requests with any other sender domain are rejected.
 - Deterministic fallback avatars use stable name-derived initials and HSL gradients when no profile photo is available.
-- Drafts auto-save while you compose (localStorage) and can be reopened to edit.
-- Sent emails are recorded locally so you can review them in **Sent**.
+- Drafts auto-save while you compose and can be reopened to edit.
+- Sent and received emails are recorded in Convex so users can review matching mailbox entries.
 
 ## Setup
 
@@ -67,7 +67,6 @@ If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing key
 
 ```json
 {
-  "from": "sales@mail.darvizlabs.online",
   "to": ["customer@example.com"],
   "cc": ["boss@example.com"],
   "bcc": ["audit@example.com"],
@@ -78,10 +77,10 @@ If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing key
 
 Server-side rules:
 
-- `from` must end with `@mail.darvizlabs.online` (the local part is validated too).
+- The authenticated user must have an assigned `@mail.darvizlabs.online` sender address.
 - At least one `to` recipient is required; recipients are basic email validated.
 - `replyTo` is set to the sender so replies land back on the custom address.
 
 ## Storage note
 
-Sent/draft/read/star state is kept in `localStorage` for this demo. Incoming mail is not fetched — Resend is used for sending only (an inbound webhook could be added later).
+Sent, received, and draft messages are stored in Convex. Inbox visibility is keyed by recipient email, so a user sees received mail for their account email and assigned company email. Read/star/trash/archive state is not yet durable.

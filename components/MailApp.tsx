@@ -13,8 +13,6 @@ import ComposeModal from "@/components/ComposeModal";
 import {
   buildFromAddress,
   isValidEmail,
-  loadEmails,
-  saveEmails,
   uid,
 } from "@/lib/mail";
 import { authClient } from "@/lib/auth-client";
@@ -33,8 +31,9 @@ export default function MailApp() {
   const { data: session } = authClient.useSession();
   const ensureCurrentProfile = useMutation(api.profiles.ensureCurrentProfile);
   const profileData = useQuery(api.profiles.getMyProfile);
-  const [emails, setEmails] = useState<Email[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const drafts = useQuery(api.mail.listDrafts);
+  const upsertDraft = useMutation(api.mail.upsertDraft);
+  const deleteDraft = useMutation(api.mail.deleteDraft);
   const [folder, setFolder] = useState<FolderKey>("inbox");
   const mailboxFolder = folder === "inbox" || folder === "sent" ? folder : "inbox";
   const mailboxEntries = usePaginatedQuery(
@@ -51,32 +50,15 @@ export default function MailApp() {
   const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Reading persisted mail from localStorage is an external-system sync.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setEmails(loadEmails().filter((email) => email.folder === "drafts"));
-    setLoaded(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
-
-  useEffect(() => {
-    if (loaded) saveEmails(emails.filter((email) => email.folder === "drafts"));
-  }, [emails, loaded]);
-
-  useEffect(() => {
     if (!session?.user) return;
     void ensureCurrentProfile();
   }, [ensureCurrentProfile, session?.user]);
-
-  const patchEmail = useCallback((id: string, patch: Partial<Email>) => {
-    setEmails((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-    );
-  }, []);
 
   const convexEmails = useMemo<Email[]>(() => {
     return (mailboxEntries.results ?? []).map((entry) => ({
       id: entry.messageId,
       from: entry.fromEmail,
+      fromName: entry.fromName,
       to: entry.to,
       cc: entry.cc,
       bcc: [],
@@ -89,9 +71,26 @@ export default function MailApp() {
     }));
   }, [mailboxEntries.results]);
 
+  const draftEmails = useMemo<Email[]>(() => {
+    return (drafts ?? []).map((draft) => ({
+      id: draft.draftKey,
+      from: draft.fromEmail,
+      fromName: draft.fromEmail,
+      to: draft.to,
+      cc: draft.cc,
+      bcc: draft.bcc,
+      subject: draft.subject,
+      body: draft.body,
+      folder: "drafts",
+      starred: false,
+      read: true,
+      createdAt: draft.updatedAt,
+    }));
+  }, [drafts]);
+
   const allEmails = useMemo(
-    () => [...convexEmails, ...emails],
-    [convexEmails, emails],
+    () => [...convexEmails, ...draftEmails],
+    [convexEmails, draftEmails],
   );
 
   const filtered = useMemo(() => {
@@ -136,6 +135,7 @@ export default function MailApp() {
     ? {
         id: selectedMessage._id,
         from: selectedMessage.fromEmail,
+        fromName: selectedMessage.fromName,
         to: selectedMessage.to,
         cc: selectedMessage.cc,
         bcc: selectedMessage.bcc,
@@ -176,11 +176,9 @@ export default function MailApp() {
   }, []);
 
   const discardCompose = useCallback(() => {
-    setEmails((prev) =>
-      prev.filter((e) => e.id !== compose.draftId || e.folder !== "drafts"),
-    );
+    if (compose.draftId) void deleteDraft({ draftKey: compose.draftId });
     closeCompose();
-  }, [compose.draftId, closeCompose]);
+  }, [closeCompose, compose.draftId, deleteDraft]);
 
   useEffect(() => {
     if (!compose.open || sending) return;
@@ -190,28 +188,18 @@ export default function MailApp() {
       compose.body.trim() !== "";
     if (!hasContent) return;
     const timer = setTimeout(() => {
-      setEmails((prev) => {
-        const draft: Email = {
-          id: compose.draftId as string,
-          from: profileData?.profile?.assignedEmail ?? buildFromAddress(compose.fromName),
-          to: compose.to,
-          cc: compose.cc,
-          bcc: compose.bcc,
-          subject: compose.subject,
-          body: compose.body,
-          folder: "drafts",
-          starred: false,
-          read: true,
-          createdAt: Date.now(),
-        };
-        const exists = prev.some((e) => e.id === draft.id);
-        return exists
-          ? prev.map((e) => (e.id === draft.id ? draft : e))
-          : [draft, ...prev];
+      void upsertDraft({
+        draftKey: compose.draftId as string,
+        fromEmail: profileData?.profile?.assignedEmail ?? buildFromAddress(compose.fromName),
+        to: compose.to,
+        cc: compose.cc,
+        bcc: compose.bcc,
+        subject: compose.subject,
+        body: compose.body,
       });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [compose, profileData?.profile?.assignedEmail, sending]);
+  }, [compose, profileData?.profile?.assignedEmail, sending, upsertDraft]);
 
   const handleSend = useCallback(async () => {
     const allRecipients = [...compose.to, ...compose.cc, ...compose.bcc];
@@ -247,7 +235,7 @@ export default function MailApp() {
         setSendError(data.error ?? "Failed to send the message.");
         return;
       }
-      setEmails((prev) => prev.filter((e) => e.id !== compose.draftId));
+      if (compose.draftId) await deleteDraft({ draftKey: compose.draftId });
       setFolder("sent");
       setSelectedId(null);
       closeCompose();
@@ -257,7 +245,7 @@ export default function MailApp() {
     } finally {
       setSending(false);
     }
-  }, [compose, closeCompose, profileData?.profile?.assignedEmail]);
+  }, [compose, closeCompose, deleteDraft, profileData?.profile?.assignedEmail]);
 
   const handleOpen = useCallback(
     (email: Email) => {
@@ -267,52 +255,45 @@ export default function MailApp() {
       }
       setSelectedId(email.id);
       setSelectedIds(new Set());
-      if (!email.read) {
-        patchEmail(email.id, { read: true });
-      }
     },
-    [openCompose, patchEmail],
+    [openCompose],
   );
 
   const handleDelete = useCallback(
     (id: string) => {
-      setEmails((prev) =>
-        prev.some((e) => e.id === id && e.folder === "trash")
-          ? prev.filter((e) => e.id !== id)
-          : prev.map((e) =>
-              e.id === id ? { ...e, folder: "trash" as FolderKey } : e,
-            ),
-      );
+      const email = allEmails.find((item) => item.id === id);
+      if (email?.folder !== "drafts") {
+        toast.info("Archive and delete will be available after mailbox state is synced.");
+        return;
+      }
+      void deleteDraft({ draftKey: id });
       setSelectedId(null);
       setSelectedIds(new Set());
-      toast.success("Moved to trash");
+      toast.success("Draft deleted");
     },
-    [],
+    [allEmails, deleteDraft],
   );
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
-    setEmails((prev) =>
-      prev.map((e) =>
-        selectedIds.has(e.id) && e.folder !== "trash"
-          ? { ...e, folder: "trash" as FolderKey }
-          : e,
-      ),
+    const selectedDraftIds = [...selectedIds].filter((id) =>
+      allEmails.some((email) => email.id === id && email.folder === "drafts"),
     );
+    if (selectedDraftIds.length === 0) {
+      toast.info("Bulk archive and delete will be available after mailbox state is synced.");
+      setSelectedIds(new Set());
+      return;
+    }
+    for (const id of selectedDraftIds) {
+      void deleteDraft({ draftKey: id });
+    }
     setSelectedIds(new Set());
     toast.success(
-      `${selectedIds.size} message${selectedIds.size > 1 ? "s" : ""} moved to trash`,
+      `${selectedDraftIds.length} draft${selectedDraftIds.length > 1 ? "s" : ""} deleted`,
     );
-  }, [selectedIds]);
+  }, [allEmails, deleteDraft, selectedIds]);
 
-  const toggleStar = useCallback(
-    (id: string) => {
-      setEmails((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, starred: !e.starred } : e)),
-      );
-    },
-    [],
-  );
+  const toggleStar = useCallback(() => {}, []);
 
   const navigate = useCallback((next: FolderKey) => {
     setFolder(next);
@@ -321,10 +302,7 @@ export default function MailApp() {
     setNavOpen(false);
   }, []);
 
-  const markUnread = useCallback(
-    (id: string) => patchEmail(id, { read: false }),
-    [patchEmail],
-  );
+  const markUnread = useCallback(() => {}, []);
 
   const handleSignOut = useCallback(async () => {
     await authClient.signOut();
@@ -342,7 +320,6 @@ export default function MailApp() {
         onSearchChange={setSearch}
         onOpenNav={() => setNavOpen(true)}
         onRefresh={() => {
-          setEmails(loadEmails());
           setSelectedId(null);
           toast.success("Refreshed");
         }}

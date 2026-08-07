@@ -39,7 +39,7 @@ export default defineSchema({
     bcc: v.array(v.string()),
     subject: v.string(),
     body: v.string(),
-    status: v.union(v.literal("sent"), v.literal("failed")),
+    status: v.union(v.literal("sent"), v.literal("received"), v.literal("failed")),
     idempotencyKey: v.optional(v.string()),
     createdAt: v.number(),
   })
@@ -66,4 +66,19 @@ export default defineSchema({
   })
     .index("by_owner_folder_createdAt", ["ownerKey", "folder", "createdAt"])
     .index("by_message", ["messageId"]),
+
+  drafts: defineTable({
+    draftKey: v.string(),
+    ownerUserId: v.string(),
+    fromEmail: v.string(),
+    to: v.array(v.string()),
+    cc: v.array(v.string()),
+    bcc: v.array(v.string()),
+    subject: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_updatedAt", ["ownerUserId", "updatedAt"])
+    .index("by_owner_draftKey", ["ownerUserId", "draftKey"]),
 });

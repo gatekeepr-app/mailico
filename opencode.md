@@ -130,3 +130,11 @@ This file captures implementation context for future OpenCode sessions. It inten
 - Replaced the `/` placeholder with a minimal public Mailico landing page.
 - Added a restrained editorial layout with sign-in, workspace, and manual entry points.
 - Kept authenticated product routes separate at `/mail` and `/admin`.
+
+## 2026-08-07 - Received Mail and Convex Drafts
+
+- Added `POST /api/receive` for inbound mail ingestion into Convex.
+- Added `recordInboundMessage` to create received messages and inbox entries by recipient email.
+- Inbox queries now merge the current profile's account email and assigned company email.
+- Added a Convex `drafts` table with list/upsert/delete functions.
+- Replaced browser localStorage draft persistence with Convex-backed draft autosave.
