@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { EnvelopeSimple } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import EmailList from "@/components/EmailList";

@@ -198,7 +198,7 @@ export async function POST(req: Request) {
         signature: req.headers.get("svix-signature") ?? "",
       },
       webhookSecret,
-    }) as Record<string, unknown>;
+    }) as unknown as Record<string, unknown>;
   } catch (error) {
     if (error instanceof PayloadTooLargeError) {
       return Response.json({ error: "Webhook payload is too large." }, { status: 413 });

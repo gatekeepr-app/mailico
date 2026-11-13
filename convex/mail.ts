@@ -62,7 +62,7 @@ async function getMailboxState(ctx: Ctx, ownerUserId: string, messageId: Id<"mes
     .unique();
 }
 
-async function attachMailboxState<T extends { messageId: Id<"messages"> }>(
+async function attachMailboxState<T extends { messageId: Id<"messages">; folder: string }>(
   ctx: Ctx,
   ownerUserId: string,
   entries: T[],
@@ -188,8 +188,6 @@ export const listMailboxEntries = query({
       };
     }
 
-    const ownerKey = args.folder === "sent" ? userKey(user._id) : null;
-
     if (args.folder === "inbox") {
       const offset = args.paginationOpts.cursor
         ? Number.parseInt(args.paginationOpts.cursor, 10)
@@ -231,12 +229,15 @@ export const listMailboxEntries = query({
       };
     }
 
-    if (!ownerKey) return { page: [], isDone: true, continueCursor: "" };
+    if (args.folder !== "sent") {
+      return { page: [], isDone: true, continueCursor: "" };
+    }
 
+    const ownerKey = userKey(user._id);
     const result = await ctx.db
       .query("mailboxEntries")
       .withIndex("by_owner_folder_createdAt", (q) =>
-        q.eq("ownerKey", ownerKey).eq("folder", args.folder),
+        q.eq("ownerKey", ownerKey).eq("folder", "sent"),
       )
       .order("desc")
       .paginate(args.paginationOpts);

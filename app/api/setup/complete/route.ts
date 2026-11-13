@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!user?._id || !user.email) {
     return Response.json({ error: "Sign in before completing company setup." }, { status: 401 });
   }
-  if (profileData.companySettings) {
+  if (profileData?.companySettings) {
     return Response.json({ error: "Company setup has already been completed." }, { status: 409 });
   }
 
