@@ -76,6 +76,38 @@ async function sendResetPasswordEmail({
   }
 }
 
+async function sendVerificationEmail({
+  user,
+  url,
+}: {
+  user: { email: string; name?: string | null };
+  url: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const safeUrl = escapeHtml(url);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `Mailico <auth@${MAIL_DOMAIN}>`,
+        to: [user.email],
+        subject: "Verify your Mailico email address",
+        html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Verify your email address if prompted while signing in:</p><p><a href="${safeUrl}">Verify email address</a></p><p>If you did not create this account, you can ignore this email.</p>`,
+        text: `Verify your Mailico email address: ${url}`,
+      }),
+    });
+    if (!res.ok) console.error("Resend verification email failed", res.status);
+  } catch (error) {
+    console.error("Could not send optional verification email", error);
+  }
+}
+
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
@@ -89,6 +121,11 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       enabled: true,
       requireEmailVerification: false,
       sendResetPassword: sendResetPasswordEmail,
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail,
     },
     plugins: [convex({ authConfig })],
   });

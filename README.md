@@ -1,6 +1,6 @@
 # Mailico
 
-A Gmail-style mail client that sends email through [Resend](https://resend.com) from any address on the `mail.darvizlabs.online` domain.
+A Gmail-style mail client that sends email through [Resend](https://resend.com) from a company domain selected during first-run setup.
 
 ## Features
 
@@ -13,34 +13,44 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
 
 ## Setup
 
-1. Verify the `mail.darvizlabs.online` domain in [Resend](https://resend.com/domains) and add the required DNS records.
-2. Create a [Resend API key](https://resend.com/api-keys).
-3. Configure local Next.js env in `.env.local`:
+1. Configure the environment variables below. An account can be created before `RESEND_API_KEY` is available; password reset and mail delivery need the key.
+2. Configure local Next.js env in `.env.local`:
 
    ```
    NEXT_PUBLIC_CONVEX_URL=https://your-dev-deployment.convex.cloud
    NEXT_PUBLIC_CONVEX_SITE_URL=https://your-dev-deployment.convex.site
-   RESEND_API_KEY=re_xxxxxxxx
+   RESEND_API_KEY= # add after creating a Resend key
+   RESEND_WEBHOOK_SECRET=whsec_xxxxxxxx
+   MAILICO_INTERNAL_SECRET=use-a-long-random-secret
+   MAILICO_OWNER_SETUP_TOKEN=use-a-different-random-secret-at-least-32-characters
    ```
 
-4. Configure Convex env for auth and server-side email:
+3. Configure Convex env for auth and server-side email:
 
    ```bash
    npx convex env set SITE_URL http://localhost:3000
    npx convex env set BETTER_AUTH_SECRET "your-32-byte-or-longer-secret"
+   # After creating the Resend key:
    npx convex env set RESEND_API_KEY "re_xxxxxxxx"
+   npx convex env set MAILICO_INTERNAL_SECRET "same-long-random-secret"
    ```
 
    `SITE_URL` and `BETTER_AUTH_SECRET` must be set in Convex because `convex/auth.ts` runs in Convex, not in Vercel or the local Next.js process.
 
-5. Install and run:
+4. Install and run:
 
    ```bash
    npm install
    npm run dev
    ```
 
-6. Open http://localhost:3000, sign in/register, then use `/mail`.
+5. Open http://localhost:3000, create and sign in to an account, then complete `/setup` with the one-time owner setup token. Choose the company domain and first sender address (for example `admin@mail.darvizlabs.online`). The token must be configured in the Next.js server environment and can be removed after the company is set up.
+
+6. In setup, confirm the Resend key is configured and use **Yes, check Resend**. Mailico validates the server-side key and looks up the configured domain status. If needed, add the domain to [Resend](https://resend.com/domains), publish its DNS records, and check again. Create the [Resend API key](https://resend.com/api-keys) if one is not configured yet.
+
+The first account that submits a valid one-time owner setup token becomes the business owner and receives the initial admin sender. New users register normally, then request a company address from `/mail`; admins and HR leads review those requests in `/admin`.
+
+For inbound email, configure the Resend webhook to `POST /api/receive` and set its signing secret as `RESEND_WEBHOOK_SECRET` in the Next.js environment. Set a separate high-entropy `MAILICO_INTERNAL_SECRET` in both Next.js and Convex environments; it authenticates internal Next.js-to-Convex persistence calls for inbound and sent mail. Resend's Svix signature is verified against the raw request body before parsing. Inbound ingestion fails closed when either secret is missing, and the database-writing mutation is internal-only.
 
 ## Production Env
 
@@ -49,6 +59,10 @@ Vercel needs the public Convex URLs:
 ```env
 NEXT_PUBLIC_CONVEX_URL=...
 NEXT_PUBLIC_CONVEX_SITE_URL=...
+RESEND_API_KEY=...
+RESEND_WEBHOOK_SECRET=...
+MAILICO_INTERNAL_SECRET=...
+MAILICO_OWNER_SETUP_TOKEN=...
 ```
 
 Convex production needs the auth and server-side secrets:
@@ -57,7 +71,13 @@ Convex production needs the auth and server-side secrets:
 npx convex env set SITE_URL https://mailico.darvizlabs.online --prod
 npx convex env set BETTER_AUTH_SECRET "your-production-secret" --prod
 npx convex env set RESEND_API_KEY "re_xxxxxxxx" --prod
+npx convex env set MAILICO_INTERNAL_SECRET "same-long-random-secret" --prod
 ```
+
+Set `MAILICO_INTERNAL_SECRET` in both Vercel and Convex, and set `RESEND_WEBHOOK_SECRET` in Vercel. Configure the Resend webhook signing secret in Vercel and point the webhook at `https://mailico.darvizlabs.online/api/receive`.
+Set `MAILICO_OWNER_SETUP_TOKEN` only in the Next.js server environment before first-run setup. Use a separate high-entropy value and remove it after the owner has completed setup.
+
+Better Auth account recovery messages use the Mailico service sender `auth@mail.darvizlabs.online`; that service domain must remain verified in the Resend account used by Convex. Company messages use the separate domain selected in `/setup`.
 
 If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing keys, clear the stale `jwks` rows in the Better Auth Convex component or restore the original secret. Otherwise `/api/auth/convex/token` can fail with `Failed to decrypt private key`.
 
@@ -77,10 +97,11 @@ If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing key
 
 Server-side rules:
 
-- The authenticated user must have an assigned `@mail.darvizlabs.online` sender address.
+- The authenticated user must have an assigned sender at the configured company domain.
 - At least one `to` recipient is required; recipients are basic email validated.
+- Each user can send up to 30 messages per hour; the quota is enforced in Convex across server instances.
 - `replyTo` is set to the sender so replies land back on the custom address.
 
 ## Storage note
 
-Sent, received, and draft messages are stored in Convex. Inbox visibility is keyed by recipient email, so a user sees received mail for their account email and assigned company email. Read/star/trash/archive state is not yet durable.
+Sent, received, drafts, and per-user read/star/trash state are stored in Convex. Inbox visibility is keyed by recipient email, so a user sees received mail for their account email and assigned company email. Resend status checks validate the Next.js API key; password recovery and auth email delivery also need the key in Convex.

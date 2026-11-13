@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Mailico",
-  description: "Send email from any address on mail.darvizlabs.online",
+  description: "Set up and manage your organization's company mail",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

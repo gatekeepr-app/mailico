@@ -18,6 +18,7 @@ interface SidebarProps {
   onNavigate: (folder: FolderKey) => void;
   onCompose: () => void;
   onClose: () => void;
+  mailDomain: string;
 }
 
 const NAV_ITEMS: { key: FolderKey; icon: typeof Inbox }[] = [
@@ -34,6 +35,7 @@ export default function Sidebar({
   onNavigate,
   onCompose,
   onClose,
+  mailDomain,
 }: SidebarProps) {
   return (
     <aside className="w-16 shrink-0 border-r border-gray-200 bg-white md:w-64">
@@ -97,7 +99,7 @@ export default function Sidebar({
         Sending from
         <br />
         <span className="font-medium text-gray-600">
-          *@mail.darvizlabs.online
+          *@{mailDomain}
         </span>
       </div>
     </aside>

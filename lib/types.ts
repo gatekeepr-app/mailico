@@ -1,5 +1,3 @@
-export const ALLOWED_DOMAIN = "mail.darvizlabs.online";
-
 export type FolderKey = "inbox" | "starred" | "sent" | "drafts" | "trash";
 
 export interface Email {

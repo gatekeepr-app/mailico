@@ -13,22 +13,29 @@ export default function HomePage() {
             </span>
             Mailico
           </Link>
-          <Button asChild variant="ghost" className="rounded-full">
-            <Link href="/login">Sign in</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" className="rounded-full">
+              <Link href="/pricing">Plans</Link>
+            </Button>
+            <Button asChild variant="ghost" className="rounded-full">
+              <Link href="/login">Sign in</Link>
+            </Button>
+            <Button asChild className="rounded-full bg-[#171511] text-[#f7f5ef] hover:bg-[#2a251d]">
+              <Link href="/register">Create account</Link>
+            </Button>
+          </div>
         </header>
 
         <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-10">
           <div className="max-w-2xl">
             <div className="mb-8 inline-flex rounded-full border border-[#171511]/15 bg-white/60 px-3 py-1 text-xs font-medium text-[#5f594d]">
-              Private mail operations for Darviz Labs
+              Private mail operations for your organization
             </div>
             <h1 className="text-balance text-6xl font-semibold leading-[0.92] tracking-[-0.06em] sm:text-7xl lg:text-8xl">
               Company mail, without the noise.
             </h1>
             <p className="mt-7 max-w-lg text-pretty text-base leading-7 text-[#686154] sm:text-lg">
-              Mailico keeps assigned senders, departments, and internal message
-              visibility in one focused workspace for the people who need it.
+              Set up your business mail domain, assign employee addresses, and manage company messages in one focused workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-full bg-[#171511] text-[#f7f5ef] hover:bg-[#2a251d]">
@@ -67,7 +74,7 @@ export default function HomePage() {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{subject}</p>
-                        <p className="text-xs text-[#8a8172]">mail.darvizlabs.online</p>
+                        <p className="text-xs text-[#8a8172]">mail.example.com</p>
                       </div>
                       <p className="text-xs text-[#8a8172]">{time}</p>
                     </div>

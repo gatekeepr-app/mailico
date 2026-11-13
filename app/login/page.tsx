@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Eye, EyeOff, Mail } from "lucide-react";
+import { EnvelopeSimple, Eye, EyeSlash } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,16 +90,25 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 px-4">
-      <div className="mb-6 flex items-center gap-2">
-        <Mail className="h-7 w-7 text-[#0b57d0]" />
-        <span className="text-xl font-semibold">Mailico</span>
-      </div>
+    <main className="grid min-h-[100dvh] bg-[#f5f5f0] text-[#1c2824] lg:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)]">
+      <aside className="flex flex-col justify-between bg-[#193e37] px-7 py-8 text-[#f4f5ef] sm:px-10 lg:min-h-[100dvh] lg:px-12 lg:py-12">
+        <Link href="/" className="flex w-fit items-center gap-3" aria-label="Mailico home">
+          <span className="flex size-10 items-center justify-center border border-white/20 bg-white/5"><EnvelopeSimple size={19} /></span>
+          <span className="text-sm font-semibold tracking-wide">Mailico</span>
+        </Link>
+        <div className="my-12 max-w-sm lg:my-auto">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#b7d6c9]">Your work, in one place</p>
+          <p className="mt-4 text-3xl font-medium leading-tight tracking-[-0.035em] sm:text-4xl">A calmer home for company email.</p>
+          <p className="mt-4 text-sm leading-6 text-white/70">Sign in to continue to your team mailbox and workspace.</p>
+        </div>
+        <p className="hidden text-xs text-white/45 lg:block">Secure access for your organization</p>
+      </aside>
 
-      <Card className="w-full max-w-sm">
+      <section className="flow-enter flex min-w-0 items-center justify-center px-5 py-10 sm:px-10 lg:px-[8%]">
+      <Card className="w-full max-w-md rounded-none border-0 bg-transparent shadow-none">
         <CardHeader>
-          <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Sign in to your Mailico account</CardDescription>
+          <CardTitle className="text-3xl font-medium tracking-[-0.04em]">Welcome back</CardTitle>
+          <CardDescription>Sign in with your account email to open your workspace.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
@@ -134,7 +143,7 @@ export default function LoginPage() {
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -146,7 +155,7 @@ export default function LoginPage() {
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               New to Mailico?{" "}
-              <Link href="/register" className="text-primary hover:underline">
+              <Link href="/register" className="font-medium text-[#286653] hover:underline">
                 Create an account
               </Link>
             </p>
@@ -187,6 +196,7 @@ export default function LoginPage() {
           </CardFooter>
         </form>
       </Card>
+      </section>
     </main>
   );
 }

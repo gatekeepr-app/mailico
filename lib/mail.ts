@@ -1,4 +1,4 @@
-import { ALLOWED_DOMAIN, type Email, type FolderKey } from "./types";
+import { type Email, type FolderKey } from "./types";
 
 const STORAGE_KEY = "mailico.emails.v1";
 
@@ -13,9 +13,10 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export function buildFromAddress(localPart: string): string {
+export function buildFromAddress(localPart: string, domain: string): string {
+  if (!domain) return "";
   const clean = localPart.trim().replace(/@.*$/, "").toLowerCase();
-  return `${clean}@${ALLOWED_DOMAIN}`;
+  return `${clean}@${domain}`;
 }
 
 export function splitRecipients(raw: string): string[] {

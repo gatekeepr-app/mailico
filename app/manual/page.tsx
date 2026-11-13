@@ -6,9 +6,9 @@ const sections = [
     title: "Getting started",
     items: [
       "Create an account at /register or sign in at /login.",
-      "After sign-in, open the authenticated mail app at /mail.",
-      "Your account profile is created automatically the first time you open the app.",
-      "The first profile created becomes the admin account. Later accounts default to user.",
+      "Sign in after creating your account. The first account to complete setup configures the company domain and becomes the business owner.",
+      "The setup page assigns the owner's first company sender address, such as admin@mail.example.com.",
+      "After company setup, later accounts start as users and can request a company address for admin or HR approval.",
     ],
   },
   {
@@ -24,8 +24,8 @@ const sections = [
     items: [
       "Admin or HR opens /admin.",
       "Create any departments needed, such as HR, Sales, Engineering, or Operations.",
-      "For each employee, choose a role, optional department, and the local part of their company email.",
-      "Only the local part is editable. The domain is always mail.darvizlabs.online.",
+      "Review pending email address requests in the Email address requests panel and approve or decline them.",
+      "For each employee, choose a role, optional department, and a local part at the configured company domain.",
       "An employee cannot send mail until a company email address is assigned.",
     ],
   },
@@ -44,7 +44,7 @@ const sections = [
     items: [
       "Users see messages they sent and messages addressed to their account email or assigned company email.",
       "Drafts auto-save to Convex and follow the signed-in account.",
-      "Read/star/trash state is not yet persisted in Convex.",
+      "Read/unread, starred, and trash status are saved per user.",
     ],
   },
   {

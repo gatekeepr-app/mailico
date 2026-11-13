@@ -1,10 +1,91 @@
-import { ConvexHttpClient } from "convex/browser";
-import { api } from "@/convex/_generated/api";
+import { Resend } from "resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BODY_LENGTH = 100_000;
+const MAX_WEBHOOK_BYTES = 512_000;
+const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
+const REQUEST_BODY_TIMEOUT_MS = 15_000;
+const PROVIDER_TIMEOUT_MS = 10_000;
+
+class PayloadTooLargeError extends Error {}
+class StreamTimeoutError extends Error {}
+
+async function readStreamLimited(
+  stream: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+  timeoutMs?: number,
+): Promise<Uint8Array> {
+  if (!stream) return new Uint8Array();
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+
+  try {
+    while (true) {
+      let result: ReadableStreamReadResult<Uint8Array>;
+      if (deadline === undefined) {
+        result = await reader.read();
+      } else {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) throw new StreamTimeoutError();
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          result = await Promise.race([
+            reader.read(),
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(() => reject(new StreamTimeoutError()), remainingMs);
+            }),
+          ]);
+        } finally {
+          if (timeout !== undefined) clearTimeout(timeout);
+        }
+      }
+      const { done, value } = result;
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new PayloadTooLargeError();
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+async function readRequestBodyLimited(request: Request, maxBytes: number) {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new PayloadTooLargeError();
+  }
+  const bytes = await readStreamLimited(request.body, maxBytes, REQUEST_BODY_TIMEOUT_MS);
+  return new TextDecoder().decode(bytes);
+}
+
+async function readResponseJsonLimited(response: Response, maxBytes: number) {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new PayloadTooLargeError();
+  }
+  const bytes = await readStreamLimited(response.body, maxBytes);
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -78,6 +159,7 @@ async function retrieveReceivedEmail(emailId: string) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     },
   );
 
@@ -85,25 +167,46 @@ async function retrieveReceivedEmail(emailId: string) {
     throw new Error(`Failed to retrieve received email ${emailId}: ${response.status}`);
   }
 
-  return asRecord(await response.json());
+  return asRecord(await readResponseJsonLimited(response, MAX_PROVIDER_RESPONSE_BYTES));
 }
 
 export async function POST(req: Request) {
-  const receiveSecret = process.env.RECEIVE_WEBHOOK_SECRET;
-  if (receiveSecret && req.headers.get("x-mailico-secret") !== receiveSecret) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    return Response.json({ error: "Inbound webhook is not configured." }, { status: 503 });
   }
 
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!convexUrl) {
-    return Response.json({ error: "NEXT_PUBLIC_CONVEX_URL is not configured." }, { status: 500 });
+  const internalSecret = process.env.MAILICO_INTERNAL_SECRET;
+  if (!internalSecret) {
+    return Response.json({ error: "Inbound storage is not configured." }, { status: 503 });
+  }
+
+  const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+  if (!convexSiteUrl) {
+    return Response.json({ error: "NEXT_PUBLIC_CONVEX_SITE_URL is not configured." }, { status: 500 });
   }
 
   let payload: Record<string, unknown>;
   try {
-    payload = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+    const rawPayload = await readRequestBodyLimited(req, MAX_WEBHOOK_BYTES);
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    payload = resend.webhooks.verify({
+      payload: rawPayload,
+      headers: {
+        id: req.headers.get("svix-id") ?? "",
+        timestamp: req.headers.get("svix-timestamp") ?? "",
+        signature: req.headers.get("svix-signature") ?? "",
+      },
+      webhookSecret,
+    }) as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      return Response.json({ error: "Webhook payload is too large." }, { status: 413 });
+    }
+    if (error instanceof StreamTimeoutError) {
+      return Response.json({ error: "Webhook payload was not received in time." }, { status: 408 });
+    }
+    return Response.json({ error: "Invalid webhook signature or JSON body." }, { status: 401 });
   }
 
   const eventType = stringValue(payload.type);
@@ -113,7 +216,12 @@ export async function POST(req: Request) {
 
   const eventData = asRecord(payload.data || payload);
   const emailId = stringValue(eventData.email_id || eventData.id);
-  const emailData = emailId ? await retrieveReceivedEmail(emailId) : null;
+  let emailData: Record<string, unknown> | null;
+  try {
+    emailData = emailId ? await retrieveReceivedEmail(emailId) : null;
+  } catch {
+    return Response.json({ error: "Could not retrieve the inbound message from the provider." }, { status: 502 });
+  }
   const data = { ...eventData, ...(emailData ?? {}) };
   const headers = asRecord(data.headers);
 
@@ -142,18 +250,30 @@ export async function POST(req: Request) {
   const messageIdHeader = stringValue(data.messageId) || stringValue(data.message_id);
   const idempotencyKey = messageIdHeader || resendId;
 
-  const client = new ConvexHttpClient(convexUrl);
-  const messageId = await client.mutation(api.mail.recordInboundMessage, {
-    resendId,
-    idempotencyKey,
-    fromEmail,
-    fromName: cleanName(stringValue(headers.from) || fromValue),
-    to,
-    cc,
-    bcc,
-    subject,
-    body,
+  const response = await fetch(`${convexSiteUrl.replace(/\/$/, "")}/mail/record-inbound`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-mailico-secret": internalSecret,
+    },
+    body: JSON.stringify({
+      resendId,
+      idempotencyKey,
+      fromEmail,
+      fromName: cleanName(stringValue(headers.from) || fromValue),
+      to,
+      cc,
+      bcc,
+      subject,
+      body,
+    }),
   });
-
-  return Response.json({ ok: true, messageId });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return Response.json(
+      { error: result?.error ?? "Failed to persist inbound email." },
+      { status: response.status },
+    );
+  }
+  return Response.json(result);
 }

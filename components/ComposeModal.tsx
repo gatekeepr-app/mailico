@@ -6,6 +6,7 @@ import type { ComposeState } from "@/lib/types";
 
 interface ComposeModalProps {
   compose: ComposeState;
+  draftSaveStatus: "idle" | "unsaved" | "saving" | "saved" | "error";
   sending: boolean;
   error: string | null;
   fromEmail?: string | null;
@@ -17,6 +18,7 @@ interface ComposeModalProps {
 
 export default function ComposeModal({
   compose,
+  draftSaveStatus,
   sending,
   error,
   fromEmail,
@@ -47,8 +49,9 @@ export default function ComposeModal({
           </h2>
           <button
             onClick={onDiscard}
+            disabled={sending}
             aria-label="Discard draft"
-            className="rounded-full p-1.5 text-gray-500 hover:bg-gray-200"
+            className="rounded-full p-1.5 text-gray-500 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X className="h-5 w-5" />
           </button>
@@ -183,8 +186,11 @@ export default function ComposeModal({
           >
             <Paperclip className="h-4 w-4" />
           </button>
-          <span className="ml-auto flex items-center gap-1 text-xs text-gray-500">
-            <Save className="h-3.5 w-3.5" /> Auto-saved
+          <span className="ml-auto flex items-center gap-1 text-xs text-gray-500" role="status" aria-live="polite">
+            {draftSaveStatus === "saving" ? "Saving…" : null}
+            {draftSaveStatus === "saved" ? <><Save className="h-3.5 w-3.5" /> Saved</> : null}
+            {draftSaveStatus === "unsaved" || draftSaveStatus === "idle" ? "Unsaved" : null}
+            {draftSaveStatus === "error" ? "Save failed" : null}
           </span>
         </div>
       </div>

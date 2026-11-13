@@ -1,16 +1,25 @@
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 type Ctx = QueryCtx | MutationCtx;
+const SEND_LIMIT_PER_HOUR = 30;
+const SEND_WINDOW_MS = 60 * 60 * 1000;
 
 async function getProfile(ctx: Ctx, authUserId: string) {
   return await ctx.db
     .query("userProfiles")
     .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+    .unique();
+}
+
+async function getCompanySettings(ctx: Ctx) {
+  return await ctx.db
+    .query("companySettings")
+    .withIndex("by_key", (q) => q.eq("key", "primary"))
     .unique();
 }
 
@@ -38,6 +47,37 @@ function preview(body: string) {
   return body.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
+function validateEmailList(values: string[]) {
+  if (values.length > 50 || values.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) {
+    throw new ConvexError("Recipients must contain at most 50 valid email addresses.");
+  }
+}
+
+async function getMailboxState(ctx: Ctx, ownerUserId: string, messageId: Id<"messages">) {
+  return await ctx.db
+    .query("mailboxStates")
+    .withIndex("by_owner_message", (q) =>
+      q.eq("ownerUserId", ownerUserId).eq("messageId", messageId),
+    )
+    .unique();
+}
+
+async function attachMailboxState<T extends { messageId: Id<"messages"> }>(
+  ctx: Ctx,
+  ownerUserId: string,
+  entries: T[],
+) {
+  return await Promise.all(entries.map(async (entry) => {
+    const state = await getMailboxState(ctx, ownerUserId, entry.messageId);
+    return {
+      ...entry,
+      starred: state?.starred ?? false,
+      read: state?.read ?? entry.folder !== "inbox",
+      trashed: state?.trashed ?? false,
+    };
+  }));
+}
+
 async function requireVisibleMessage(
   ctx: Ctx,
   messageId: Id<"messages">,
@@ -46,7 +86,10 @@ async function requireVisibleMessage(
 ) {
   const message = await ctx.db.get(messageId);
   if (!message) throw new ConvexError("Message not found.");
-  if (profile.role === "admin" || message.senderUserId === user._id) return message;
+  const settings = await getCompanySettings(ctx);
+  const isAdmin = profile.role === "admin" &&
+    (!settings || settings.ownerAuthUserId === user._id);
+  if (isAdmin || message.senderUserId === user._id) return message;
   const ownerKeys = inboxOwnerEmails(profile).map(emailKey);
 
   const entry = await ctx.db
@@ -62,7 +105,12 @@ async function requireVisibleMessage(
 
 export const listMailboxEntries = query({
   args: {
-    folder: v.union(v.literal("inbox"), v.literal("sent")),
+    folder: v.union(
+      v.literal("inbox"),
+      v.literal("sent"),
+      v.literal("starred"),
+      v.literal("trash"),
+    ),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
@@ -73,6 +121,73 @@ export const listMailboxEntries = query({
     const profile = await getProfile(ctx, user._id);
     if (!profile) return { page: [], isDone: true, continueCursor: "" };
 
+    const settings = await getCompanySettings(ctx);
+    const isAdmin = profile.role === "admin" &&
+      (!settings || settings.ownerAuthUserId === user._id);
+
+    if (args.folder === "starred" || args.folder === "trash") {
+      const statePage = args.folder === "starred"
+        ? await ctx.db
+            .query("mailboxStates")
+            .withIndex("by_owner_starred_updatedAt", (q) =>
+              q.eq("ownerUserId", user._id).eq("starred", true),
+            )
+            .filter((q) => q.eq(q.field("trashed"), false))
+            .order("desc")
+            .paginate(args.paginationOpts)
+        : await ctx.db
+            .query("mailboxStates")
+            .withIndex("by_owner_trashed_updatedAt", (q) =>
+              q.eq("ownerUserId", user._id).eq("trashed", true),
+            )
+            .order("desc")
+            .paginate(args.paginationOpts);
+      const page = await Promise.all(statePage.page.map(async (state) => {
+        const message = await requireVisibleMessage(ctx, state.messageId, user, profile);
+        return {
+          messageId: message._id,
+          fromEmail: message.fromEmail,
+          fromName: message.fromName,
+          to: message.to,
+          cc: message.cc,
+          subject: message.subject,
+          bodyPreview: preview(message.body),
+          createdAt: message.createdAt,
+          ownerKey: userKey(user._id),
+          folder: args.folder,
+          starred: state.starred,
+          read: state.read,
+        };
+      }));
+      return { ...statePage, page };
+    }
+
+    if (isAdmin && args.folder === "sent") {
+      const page = await ctx.db
+        .query("messages")
+        .withIndex("by_status_createdAt", (q) => q.eq("status", "sent"))
+        .order("desc")
+        .paginate(args.paginationOpts);
+      const entries = page.page.map((message) => ({
+        messageId: message._id,
+        fromEmail: message.fromEmail,
+        fromName: message.fromName,
+        to: message.to,
+        cc: message.cc,
+        subject: message.subject,
+        bodyPreview: preview(message.body),
+        createdAt: message.createdAt,
+        ownerKey: adminKey(),
+        folder: "sent" as const,
+      }));
+      const withState = await attachMailboxState(ctx, user._id, entries);
+      const visible = withState.filter((entry) => !entry.trashed);
+      return {
+        ...page,
+        page: visible,
+      };
+    }
+
     const ownerKey = args.folder === "sent" ? userKey(user._id) : null;
 
     if (args.folder === "inbox") {
@@ -80,7 +195,9 @@ export const listMailboxEntries = query({
         ? Number.parseInt(args.paginationOpts.cursor, 10)
         : 0;
       const start = Number.isFinite(offset) ? offset : 0;
-      const ownerKeys = inboxOwnerEmails(profile).map(emailKey);
+      const ownerKeys = isAdmin
+        ? [adminKey()]
+        : inboxOwnerEmails(profile).map(emailKey);
       const pages = await Promise.all(
         ownerKeys.map((key) =>
           ctx.db
@@ -102,8 +219,10 @@ export const listMailboxEntries = query({
           return true;
         })
         .sort((a, b) => b.createdAt - a.createdAt);
-      const page = merged.slice(start, start + args.paginationOpts.numItems);
-      const nextOffset = start + page.length;
+      const rawPage = merged.slice(start, start + args.paginationOpts.numItems);
+      const visible = await attachMailboxState(ctx, user._id, rawPage);
+      const page = visible.filter((entry) => entry.trashed !== true);
+      const nextOffset = start + rawPage.length;
 
       return {
         page,
@@ -114,18 +233,28 @@ export const listMailboxEntries = query({
 
     if (!ownerKey) return { page: [], isDone: true, continueCursor: "" };
 
-    return await ctx.db
+    const result = await ctx.db
       .query("mailboxEntries")
       .withIndex("by_owner_folder_createdAt", (q) =>
         q.eq("ownerKey", ownerKey).eq("folder", args.folder),
       )
       .order("desc")
       .paginate(args.paginationOpts);
+    const visible = await attachMailboxState(ctx, user._id, result.page);
+    const withoutTrash = visible.filter((entry) => entry.trashed !== true);
+    return { ...result, page: withoutTrash };
   },
 });
 
 export const getMessageByIdempotencyKey = query({
-  args: { idempotencyKey: v.string() },
+  args: {
+    idempotencyKey: v.string(),
+    to: v.array(v.string()),
+    cc: v.array(v.string()),
+    bcc: v.array(v.string()),
+    subject: v.string(),
+    body: v.string(),
+  },
   handler: async (ctx, args) => {
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user?._id) return null;
@@ -134,6 +263,17 @@ export const getMessageByIdempotencyKey = query({
       .withIndex("by_idempotencyKey", (q) => q.eq("idempotencyKey", args.idempotencyKey))
       .unique();
     if (!message || message.senderUserId !== user._id) return null;
+    const matches = (stored: string[], requested: string[]) =>
+      JSON.stringify(uniqueLowercase(stored)) === JSON.stringify(uniqueLowercase(requested));
+    if (
+      !matches(message.to, args.to) ||
+      !matches(message.cc, args.cc) ||
+      !matches(message.bcc, args.bcc) ||
+      message.subject !== args.subject ||
+      message.body !== args.body
+    ) {
+      return { conflict: true as const };
+    }
     return { id: message._id, resendId: message.resendId };
   },
 });
@@ -145,15 +285,80 @@ export const getMessage = query({
     const profile = await getProfile(ctx, user._id);
     if (!profile) throw new ConvexError("Profile not found.");
     const message = await requireVisibleMessage(ctx, args.messageId, user, profile);
+    const settings = await getCompanySettings(ctx);
+    const isAdmin = profile.role === "admin" &&
+      (!settings || settings.ownerAuthUserId === user._id);
     return {
       ...message,
-      bcc: profile.role === "admin" || message.senderUserId === user._id ? message.bcc : [],
+      bcc: isAdmin || message.senderUserId === user._id ? message.bcc : [],
     };
   },
 });
 
-export const recordSentMessage = mutation({
+export const setMailboxState = mutation({
   args: {
+    messageId: v.id("messages"),
+    field: v.union(v.literal("starred"), v.literal("read"), v.literal("trashed")),
+    value: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    const profile = await getProfile(ctx, user._id);
+    if (!profile) throw new ConvexError("Profile not found.");
+    const message = await requireVisibleMessage(ctx, args.messageId, user, profile);
+
+    const existing = await getMailboxState(ctx, user._id, args.messageId);
+    const state = {
+      ownerUserId: user._id,
+      messageId: args.messageId,
+      starred: existing?.starred ?? false,
+      read: existing?.read ?? message.senderUserId === user._id,
+      trashed: existing?.trashed ?? false,
+      updatedAt: Date.now(),
+    };
+    state[args.field] = args.value;
+
+    if (existing) await ctx.db.patch(existing._id, state);
+    else await ctx.db.insert("mailboxStates", state);
+  },
+});
+
+export const consumeSendQuota = internalMutation({
+  args: { authUserId: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await getProfile(ctx, args.authUserId);
+    if (!profile?.assignedEmail) {
+      throw new ConvexError("No company email is assigned to this user.");
+    }
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("sendRateLimits")
+      .withIndex("by_auth_user", (q) => q.eq("authUserId", args.authUserId))
+      .unique();
+    if (existing && now - existing.windowStart < SEND_WINDOW_MS) {
+      if (existing.count >= SEND_LIMIT_PER_HOUR) {
+        return {
+          allowed: false,
+          retryAfterSeconds: Math.ceil((existing.windowStart + SEND_WINDOW_MS - now) / 1000),
+        };
+      }
+      await ctx.db.patch(existing._id, { count: existing.count + 1 });
+    } else if (existing) {
+      await ctx.db.patch(existing._id, { windowStart: now, count: 1 });
+    } else {
+      await ctx.db.insert("sendRateLimits", {
+        authUserId: args.authUserId,
+        windowStart: now,
+        count: 1,
+      });
+    }
+    return { allowed: true, retryAfterSeconds: 0 };
+  },
+});
+
+export const recordSentMessage = internalMutation({
+  args: {
+    authUserId: v.string(),
     resendId: v.optional(v.string()),
     idempotencyKey: v.string(),
     to: v.array(v.string()),
@@ -163,30 +368,61 @@ export const recordSentMessage = mutation({
     body: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    const profile = await getProfile(ctx, user._id);
+    const profile = await getProfile(ctx, args.authUserId);
+    const settings = await getCompanySettings(ctx);
     if (!profile?.assignedEmail) {
       throw new ConvexError("No company email is assigned to this user.");
+    }
+    if (!settings || !profile.assignedEmail.toLowerCase().endsWith(`@${settings.domain}`)) {
+      throw new ConvexError("Assigned sender must use the configured company domain.");
+    }
+    validateEmailList(args.to);
+    validateEmailList(args.cc);
+    validateEmailList(args.bcc);
+    if (args.to.length === 0 || args.to.length + args.cc.length + args.bcc.length > 50) {
+      throw new ConvexError("At least one To recipient is required; 50 total recipients are allowed.");
+    }
+    if (args.subject.length > 998 || args.body.length > 100_000) {
+      throw new ConvexError("Subject or message body is too long.");
+    }
+    if (!args.idempotencyKey || args.idempotencyKey.length > 256) {
+      throw new ConvexError("A valid send operation ID is required.");
     }
 
     const existing = await ctx.db
       .query("messages")
       .withIndex("by_idempotencyKey", (q) => q.eq("idempotencyKey", args.idempotencyKey))
       .unique();
-    if (existing) return existing._id;
+    if (existing) {
+      if (existing.senderUserId !== args.authUserId) {
+        throw new ConvexError("Idempotency key has already been used.");
+      }
+      const matches = (stored: string[], requested: string[]) =>
+        JSON.stringify(uniqueLowercase(stored)) === JSON.stringify(uniqueLowercase(requested));
+      if (
+        !matches(existing.to, args.to) ||
+        !matches(existing.cc, args.cc) ||
+        !matches(existing.bcc, args.bcc) ||
+        existing.subject !== args.subject ||
+        existing.body !== args.body
+      ) {
+        throw new ConvexError("Idempotency key has already been used for different content.");
+      }
+      return existing._id;
+    }
 
     const now = Date.now();
     const to = uniqueLowercase(args.to);
     const cc = uniqueLowercase(args.cc);
     const bcc = uniqueLowercase(args.bcc);
     const fromEmail = profile.assignedEmail.toLowerCase();
-    const fromName = profile.name || user.name || fromEmail;
+    const fromName = profile.name || fromEmail;
     const bodyPreview = preview(args.body);
 
     const messageId = await ctx.db.insert("messages", {
       resendId: args.resendId,
       idempotencyKey: args.idempotencyKey,
-      senderUserId: user._id,
+      senderUserId: args.authUserId,
       fromEmail,
       fromName,
       to,
@@ -210,7 +446,7 @@ export const recordSentMessage = mutation({
     };
 
     await ctx.db.insert("mailboxEntries", {
-      ownerKey: userKey(user._id),
+      ownerKey: userKey(args.authUserId),
       folder: "sent",
       ...listFields,
     });
@@ -240,7 +476,7 @@ export const recordSentMessage = mutation({
   },
 });
 
-export const recordInboundMessage = mutation({
+export const recordInboundMessage = internalMutation({
   args: {
     resendId: v.optional(v.string()),
     idempotencyKey: v.optional(v.string()),
@@ -259,6 +495,18 @@ export const recordInboundMessage = mutation({
         .withIndex("by_idempotencyKey", (q) => q.eq("idempotencyKey", args.idempotencyKey!))
         .unique();
       if (existing) return existing._id;
+    }
+
+    validateEmailList([args.fromEmail]);
+    validateEmailList(args.to);
+    validateEmailList(args.cc);
+    validateEmailList(args.bcc);
+    if (args.to.length + args.cc.length + args.bcc.length === 0 ||
+      args.to.length + args.cc.length + args.bcc.length > 50) {
+      throw new ConvexError("Inbound mail must have 1 to 50 valid recipients.");
+    }
+    if (args.subject.length > 998 || args.body.length > 100_000) {
+      throw new ConvexError("Inbound subject or body is too long.");
     }
 
     const now = Date.now();
