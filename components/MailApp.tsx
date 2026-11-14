@@ -14,6 +14,7 @@ import EmailView from "@/components/EmailView";
 import ComposeModal from "@/components/ComposeModal";
 import {
   buildFromAddress,
+  groupEmailsIntoThreads,
   isValidEmail,
   uid,
 } from "@/lib/mail";
@@ -43,6 +44,15 @@ export default function MailApp() {
   const mailboxEntries = usePaginatedQuery(
     api.mail.listMailboxEntries,
     folder === "drafts" ? "skip" : { folder },
+    { initialNumItems: 25 },
+  );
+  const relatedMailboxEntries = usePaginatedQuery(
+    api.mail.listMailboxEntries,
+    folder === "inbox"
+      ? { folder: "sent" }
+      : folder === "sent"
+        ? { folder: "inbox" }
+        : "skip",
     { initialNumItems: 25 },
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -81,6 +91,23 @@ export default function MailApp() {
     }));
   }, [mailboxEntries.results]);
 
+  const relatedEmails = useMemo<Email[]>(() => {
+    return (relatedMailboxEntries.results ?? []).map((entry) => ({
+      id: entry.messageId,
+      from: entry.fromEmail,
+      fromName: entry.fromName,
+      to: entry.to,
+      cc: entry.cc,
+      bcc: [],
+      subject: entry.subject,
+      body: entry.bodyPreview,
+      folder: entry.folder,
+      starred: entry.starred,
+      read: entry.read,
+      createdAt: entry.createdAt,
+    }));
+  }, [relatedMailboxEntries.results]);
+
   const draftEmails = useMemo<Email[]>(() => {
     return (drafts ?? []).map((draft) => ({
       id: draft.draftKey,
@@ -99,8 +126,13 @@ export default function MailApp() {
   }, [drafts]);
 
   const allEmails = useMemo(
-    () => [...convexEmails, ...draftEmails],
-    [convexEmails, draftEmails],
+    () => {
+      const emailsById = new Map<string, Email>();
+      for (const email of relatedEmails) emailsById.set(email.id, email);
+      for (const email of convexEmails) emailsById.set(email.id, email);
+      return [...emailsById.values(), ...draftEmails];
+    },
+    [convexEmails, draftEmails, relatedEmails],
   );
 
   const filtered = useMemo(() => {
@@ -134,6 +166,12 @@ export default function MailApp() {
     () => allEmails.find((e) => e.id === selectedId) ?? null,
     [allEmails, selectedId],
   );
+  const selectedThreadMessages = useMemo(() => {
+    if (!selected) return [];
+    return groupEmailsIntoThreads(allEmails)
+      .find((thread) => thread.messages.some((message) => message.id === selected.id))
+      ?.messages ?? [selected];
+  }, [allEmails, selected]);
   const selectedMessage = useQuery(
     api.mail.getMessage,
     selected && selected.folder !== "drafts"
@@ -301,17 +339,21 @@ export default function MailApp() {
         openCompose(email);
         return;
       }
-      if (email.folder !== "sent" && !email.read) {
-        void setMailboxState({
-          messageId: email.id as Id<"messages">,
-          field: "read",
-          value: true,
-        });
+      const thread = groupEmailsIntoThreads(allEmails)
+        .find((candidate) => candidate.messages.some((message) => message.id === email.id));
+      for (const message of thread?.messages ?? [email]) {
+        if (message.folder !== "sent" && !message.read) {
+          void setMailboxState({
+            messageId: message.id as Id<"messages">,
+            field: "read",
+            value: true,
+          });
+        }
       }
       setSelectedId(email.id);
       setSelectedIds(new Set());
     },
-    [openCompose, setMailboxState],
+    [allEmails, openCompose, setMailboxState],
   );
 
   const handleDelete = useCallback(
@@ -326,14 +368,18 @@ export default function MailApp() {
         return;
       }
       const restoring = email.folder === "trash";
-      void setMailboxState({
-        messageId: id as Id<"messages">,
-        field: "trashed",
-        value: !restoring,
-      });
+      const thread = groupEmailsIntoThreads(allEmails)
+        .find((candidate) => candidate.messages.some((message) => message.id === id));
+      for (const message of thread?.messages ?? [email]) {
+        void setMailboxState({
+          messageId: message.id as Id<"messages">,
+          field: "trashed",
+          value: !restoring,
+        });
+      }
       setSelectedId(null);
       setSelectedIds(new Set());
-      toast.success(restoring ? "Message restored" : "Message moved to trash");
+      toast.success(restoring ? "Thread restored" : "Thread moved to trash");
     },
     [allEmails, deleteDraft, setMailboxState],
   );
@@ -501,16 +547,20 @@ export default function MailApp() {
           >
             <EmailList
               emails={filtered}
+              threadContextEmails={allEmails}
               folder={folder}
               selectedId={selectedId}
               selectedIds={selectedIds}
               onOpen={handleOpen}
               onToggleStar={toggleStar}
-              onToggleSelect={(id) =>
+              onToggleSelectMany={(ids) =>
                 setSelectedIds((prev) => {
                   const next = new Set(prev);
-                  if (next.has(id)) next.delete(id);
-                  else next.add(id);
+                  const remove = ids.every((id) => next.has(id));
+                  for (const id of ids) {
+                    if (remove) next.delete(id);
+                    else next.add(id);
+                  }
                   return next;
                 })
               }
@@ -523,11 +573,21 @@ export default function MailApp() {
             <div className="min-w-0 flex-1 md:flex">
               <EmailView
                 email={selectedForView ?? selected}
+                threadMessages={selectedThreadMessages}
                 onBack={() => setSelectedId(null)}
                 onToggleStar={toggleStar}
                 onDelete={handleDelete}
                 onEditDraft={(draft) => openCompose(draft)}
                 onMarkUnread={markUnread}
+                onOpenThreadMessage={handleOpen}
+                canLoadEarlierMessages={
+                  mailboxEntries.status === "CanLoadMore" ||
+                  relatedMailboxEntries.status === "CanLoadMore"
+                }
+                onLoadEarlierMessages={() => {
+                  if (mailboxEntries.status === "CanLoadMore") mailboxEntries.loadMore(25);
+                  if (relatedMailboxEntries.status === "CanLoadMore") relatedMailboxEntries.loadMore(25);
+                }}
               />
             </div>
           ) : (

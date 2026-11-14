@@ -58,6 +58,46 @@ export function formatTimestamp(ts: number): string {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+export interface EmailThread {
+  key: string;
+  messages: Email[];
+  latest: Email;
+}
+
+function normalizedThreadSubject(subject: string) {
+  return (subject || "(no subject)")
+    .trim()
+    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/i, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function threadParticipants(email: Email) {
+  return [...new Set([email.from, ...email.to, ...email.cc]
+    .map((address) => address.trim().toLowerCase())
+    .filter(Boolean))].sort();
+}
+
+export function groupEmailsIntoThreads(emails: Email[]): EmailThread[] {
+  const groups = new Map<string, Email[]>();
+
+  for (const email of emails) {
+    const key = email.folder === "drafts"
+      ? `draft:${email.id}`
+      : `${normalizedThreadSubject(email.subject)}\u0000${threadParticipants(email).join(",")}`;
+    const messages = groups.get(key) ?? [];
+    messages.push(email);
+    groups.set(key, messages);
+  }
+
+  return [...groups.entries()]
+    .map(([key, messages]) => {
+      const ordered = [...messages].sort((a, b) => a.createdAt - b.createdAt);
+      return { key, messages: ordered, latest: ordered[ordered.length - 1] };
+    })
+    .sort((a, b) => b.latest.createdAt - a.latest.createdAt);
+}
+
 export function loadEmails(): Email[] {
   if (typeof window === "undefined") return [];
   try {

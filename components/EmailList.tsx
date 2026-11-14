@@ -1,17 +1,18 @@
 "use client";
 
 import { Star, Trash2, FileText, Archive } from "lucide-react";
-import { formatMailboxName, formatTimestamp, snippet } from "@/lib/mail";
+import { formatMailboxName, formatTimestamp, groupEmailsIntoThreads, snippet } from "@/lib/mail";
 import type { Email, FolderKey } from "@/lib/types";
 
 interface EmailListProps {
   emails: Email[];
+  threadContextEmails: Email[];
   folder: FolderKey;
   selectedId: string | null;
   selectedIds: Set<string>;
   onOpen: (email: Email) => void;
   onToggleStar: (id: string) => void;
-  onToggleSelect: (id: string) => void;
+  onToggleSelectMany: (ids: string[]) => void;
   onDeleteSelected: () => void;
   onClearSelection: () => void;
 }
@@ -25,16 +26,21 @@ function displayName(email: Email): string {
 
 export default function EmailList({
   emails,
+  threadContextEmails,
   folder,
   selectedId,
   selectedIds,
   onOpen,
   onToggleStar,
-  onToggleSelect,
+  onToggleSelectMany,
   onDeleteSelected,
   onClearSelection,
 }: EmailListProps) {
   const hasSelection = selectedIds.size > 0;
+  const threads = groupEmailsIntoThreads(emails);
+  const threadContextByKey = new Map(
+    groupEmailsIntoThreads(threadContextEmails).map((thread) => [thread.key, thread] as const),
+  );
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -62,27 +68,37 @@ export default function EmailList({
           <EmptyState folder={folder} />
         ) : (
           <ul className="divide-y divide-gray-100">
-            {emails.map((email) => {
-              const active = email.id === selectedId;
+            {threads.map((thread) => {
+              const email = thread.latest;
+              const contextMessages = threadContextByKey.get(thread.key)?.messages ?? thread.messages;
+              const threadIds = contextMessages.map((message) => message.id);
+              const active = threadIds.includes(selectedId ?? "");
+              const selectedCount = threadIds.filter((id) => selectedIds.has(id)).length;
+              const allSelected = selectedCount === threadIds.length;
+              const senderNames = [...new Set(thread.messages.map(displayName))];
+              const senderLabel = folder === "sent"
+                ? displayName(email)
+                : senderNames.join(", ");
+              const unread = thread.messages.some((message) => !message.read);
               return (
-                <li key={email.id}>
+                <li key={thread.key}>
                   <div
                     onClick={() => onOpen(email)}
                     className={`flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2.5 transition hover:shadow-sm md:px-4 ${
                       active
                         ? "bg-[#d3e3fd]"
-                        : email.read
+                        : !unread
                           ? "bg-white"
                           : "bg-[#f2f6fc]"
                     }`}
                   >
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(email.id)}
+                      checked={allSelected}
                       onClick={(e) => e.stopPropagation()}
-                      onChange={() => onToggleSelect(email.id)}
+                      onChange={() => onToggleSelectMany(threadIds)}
                       className="shrink-0 accent-[#0b57d0]"
-                      aria-label="Select email"
+                      aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
                     />
                     <button
                       onClick={(e) => {
@@ -104,15 +120,20 @@ export default function EmailList({
                     <div className="flex min-w-0 flex-1 items-baseline gap-3">
                       <span
                         className={`w-40 shrink-0 truncate text-sm md:w-44 ${
-                          email.read ? "text-gray-700" : "font-bold text-gray-900"
+                          unread ? "font-bold text-gray-900" : "text-gray-700"
                         }`}
                       >
-                        {displayName(email)}
+                        {senderLabel}
                       </span>
+                      {contextMessages.length > 1 && (
+                        <span className="shrink-0 rounded-full bg-[#e8eaed] px-2 py-0.5 text-xs font-medium text-[#5f6368]">
+                          {contextMessages.length}
+                        </span>
+                      )}
                       <span className="flex min-w-0 items-baseline gap-2">
                         <span
                           className={`truncate ${
-                            email.read
+                            !unread
                               ? "text-sm text-gray-600"
                               : "text-sm font-semibold text-gray-900"
                           }`}
