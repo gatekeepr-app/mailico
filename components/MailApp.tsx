@@ -442,9 +442,8 @@ export default function MailApp() {
     }
   }, [requestEmailAddress, requestLocalPart]);
 
-  const handleSignOut = useCallback(async () => {
-    await authClient.signOut();
-    router.push("/login");
+  const handleSignOut = useCallback(() => {
+    router.push("/logout");
   }, [router]);
 
   const searchMatches = search.trim() !== "";
