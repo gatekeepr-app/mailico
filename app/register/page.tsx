@@ -64,7 +64,7 @@ export default function RegisterPage() {
       return;
     }
 
-    toast.success("Account created. Sign in to set up your company mail.");
+    toast.success("Account created. Check your real email to verify it before signing in.");
     router.push("/login");
   }
 
@@ -88,7 +88,7 @@ export default function RegisterPage() {
         <CardHeader>
           <CardTitle className="text-3xl font-medium tracking-[-0.04em]">Create your account</CardTitle>
           <CardDescription>
-            Create your account, then configure the company mail domain. Employee addresses can be requested after setup.
+            Create the business owner account here. After setup, employees join through an invitation from the administrator.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

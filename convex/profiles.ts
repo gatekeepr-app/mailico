@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
@@ -87,6 +87,7 @@ export const ensureCurrentProfile = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireAuth(ctx);
+    if (!user.emailVerified) throw new ConvexError("Verify your real email address before opening Mailico.");
     const existing = await getProfileByAuthUserId(ctx, user._id);
     const settings = await getCompanySettings(ctx);
     const now = Date.now();
@@ -113,19 +114,204 @@ export const ensureCurrentProfile = mutation({
       return await ctx.db.get(existing._id);
     }
 
-    const role = settings?.ownerAuthUserId === user._id
-      ? "admin"
-      : "user";
+    const emailNormalized = user.email.toLowerCase();
+    const invitation = settings
+      ? await ctx.db.query("employeeInvitations")
+          .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", emailNormalized).eq("status", "pending"))
+          .first()
+      : null;
+    if (settings && (!invitation || invitation.expiresAt <= now)) {
+      throw new ConvexError("Your account does not have an active employee invitation. Ask your administrator to invite you.");
+    }
+
+    const role = settings?.ownerAuthUserId === user._id ? "admin" : invitation?.role ?? "user";
     const profileId = await ctx.db.insert("userProfiles", {
       authUserId: user._id,
       accountEmail: user.email,
-      accountEmailNormalized: user.email.toLowerCase(),
-      name: user.name || user.email.split("@")[0],
+      accountEmailNormalized: emailNormalized,
+      name: invitation?.name || user.name || user.email.split("@")[0],
       role,
+      departmentId: invitation?.departmentId,
+      assignedEmail: invitation?.assignedEmail,
       createdAt: now,
       updatedAt: now,
     });
+    if (invitation) {
+      if (invitation.role === "hrLead") {
+        const departmentProfiles = await ctx.db.query("userProfiles")
+          .withIndex("by_department", (q) => q.eq("departmentId", invitation.departmentId))
+          .take(200);
+        for (const currentLead of departmentProfiles.filter((profile) => profile._id !== profileId && profile.role === "hrLead")) {
+          await ctx.db.patch(currentLead._id, { role: "user", updatedAt: now });
+        }
+      }
+      await ctx.db.patch(invitation._id, {
+        status: "accepted",
+        acceptedAuthUserId: user._id,
+        updatedAt: now,
+      });
+    }
     return await ctx.db.get(profileId);
+  },
+});
+
+export const canCreateAccountInternal = internalQuery({
+  args: { emailNormalized: v.string() },
+  handler: async (ctx, args) => {
+    const settings = await getCompanySettings(ctx);
+    if (!settings) return true;
+    const invitation = await ctx.db.query("employeeInvitations")
+      .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", args.emailNormalized).eq("status", "pending"))
+      .first();
+    return Boolean(invitation && invitation.expiresAt > Date.now());
+  },
+});
+
+export const getEmployeeInvitation = query({
+  args: { tokenHash: v.string() },
+  handler: async (ctx, args) => {
+    if (!/^[a-f0-9]{64}$/.test(args.tokenHash)) return null;
+    const invitation = await ctx.db.query("employeeInvitations")
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", args.tokenHash))
+      .unique();
+    if (!invitation || invitation.status !== "pending" || invitation.expiresAt <= Date.now()) return null;
+    const department = await ctx.db.get(invitation.departmentId);
+    const settings = await getCompanySettings(ctx);
+    if (!department || !settings) return null;
+    return {
+      name: invitation.name,
+      accountEmail: invitation.accountEmail,
+      assignedEmail: invitation.assignedEmail,
+      department: department.name,
+      role: invitation.role,
+      companyDomain: settings.domain,
+      expiresAt: invitation.expiresAt,
+    };
+  },
+});
+
+export const listEmployeeInvitations = query({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = await requireStaff(ctx);
+    const settings = await getCompanySettings(ctx);
+    if (!settings || settings.ownerAuthUserId !== user._id) {
+      throw new ConvexError("Only the business owner can manage employee invitations.");
+    }
+    const invitations = await ctx.db.query("employeeInvitations")
+      .filter((q) => q.and(q.eq(q.field("status"), "pending"), q.gt(q.field("expiresAt"), Date.now())))
+      .order("desc")
+      .take(200);
+    return await Promise.all(invitations.map(async ({ tokenHash: _tokenHash, ...invitation }) => ({
+      ...invitation,
+      department: await ctx.db.get(invitation.departmentId),
+    })));
+  },
+});
+
+export const createEmployeeInvitation = mutation({
+  args: {
+    name: v.string(),
+    accountEmail: v.string(),
+    assignedLocalPart: v.string(),
+    departmentId: v.id("departments"),
+    role: v.union(v.literal("user"), v.literal("hrLead")),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await requireStaff(ctx);
+    const settings = await getCompanySettings(ctx);
+    if (!settings || settings.ownerAuthUserId !== user._id) {
+      throw new ConvexError("Only the business owner can invite employees.");
+    }
+    const name = args.name.trim();
+    const accountEmail = args.accountEmail.trim().toLowerCase();
+    if (name.length < 2 || name.length > 120) throw new ConvexError("Enter the employee's name.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail) || accountEmail.length > 320) {
+      throw new ConvexError("Enter a valid real email address.");
+    }
+    if (!/^[a-f0-9]{64}$/.test(args.tokenHash)) throw new ConvexError("Invalid invitation token.");
+    const department = await ctx.db.get(args.departmentId);
+    if (!department) throw new ConvexError("Choose an existing department.");
+    const assignedEmail = normalizeAssignedEmail(args.assignedLocalPart, settings.domain);
+    const emailNormalized = accountEmail;
+    const existingProfile = await ctx.db.query("userProfiles")
+      .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", emailNormalized))
+      .unique();
+    if (existingProfile) throw new ConvexError("An account already exists for this real email.");
+    const assignedProfile = await ctx.db.query("userProfiles")
+      .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", assignedEmail))
+      .unique();
+    if (assignedProfile) throw new ConvexError("That company email is already assigned.");
+
+    const now = Date.now();
+    const existingInvite = await ctx.db.query("employeeInvitations")
+      .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", emailNormalized).eq("status", "pending"))
+      .first();
+    const assignedInvite = await ctx.db.query("employeeInvitations")
+      .withIndex("by_assigned_email_status", (q) => q.eq("assignedEmail", assignedEmail).eq("status", "pending"))
+      .filter((q) => q.gt(q.field("expiresAt"), now))
+      .first();
+    if (assignedInvite && assignedInvite._id !== existingInvite?._id) {
+      throw new ConvexError("That company email is already reserved by another invitation.");
+    }
+
+    if (args.role === "hrLead") {
+      const departmentProfiles = await ctx.db.query("userProfiles")
+        .withIndex("by_department", (q) => q.eq("departmentId", args.departmentId))
+        .take(200);
+      const pendingInvites = await ctx.db.query("employeeInvitations")
+        .withIndex("by_department_status", (q) => q.eq("departmentId", args.departmentId).eq("status", "pending"))
+        .filter((q) => q.gt(q.field("expiresAt"), Date.now()))
+        .take(200);
+      const pendingLead = pendingInvites.find((invite) => invite.role === "hrLead" && invite.expiresAt > now && invite._id !== existingInvite?._id);
+      if (pendingLead) throw new ConvexError("This department already has an HR Lead invitation pending.");
+    } else {
+      const departmentProfiles = await ctx.db.query("userProfiles")
+        .withIndex("by_department", (q) => q.eq("departmentId", args.departmentId))
+        .take(200);
+      const activeLead = departmentProfiles.some((profile) => profile.role === "hrLead");
+      const pendingInvites = await ctx.db.query("employeeInvitations")
+        .withIndex("by_department_status", (q) => q.eq("departmentId", args.departmentId).eq("status", "pending"))
+        .filter((q) => q.gt(q.field("expiresAt"), now))
+        .take(200);
+      if (!activeLead && !pendingInvites.some((invite) => invite.role === "hrLead")) {
+        throw new ConvexError("Invite this department’s HR Lead before adding employees to it.");
+      }
+    }
+
+    const invitationData = {
+      name,
+      accountEmail,
+      accountEmailNormalized: emailNormalized,
+      assignedEmail,
+      departmentId: args.departmentId,
+      role: args.role,
+      invitedByAuthUserId: user._id,
+      tokenHash: args.tokenHash,
+      status: "pending" as const,
+      expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+      updatedAt: now,
+    };
+    if (existingInvite) {
+      await ctx.db.patch(existingInvite._id, invitationData);
+      return existingInvite._id;
+    }
+    return await ctx.db.insert("employeeInvitations", { ...invitationData, createdAt: now });
+  },
+});
+
+export const cancelEmployeeInvitation = mutation({
+  args: { invitationId: v.id("employeeInvitations") },
+  handler: async (ctx, args) => {
+    const { user } = await requireStaff(ctx);
+    const settings = await getCompanySettings(ctx);
+    if (!settings || settings.ownerAuthUserId !== user._id) {
+      throw new ConvexError("Only the business owner can manage employee invitations.");
+    }
+    const invitation = await ctx.db.get(args.invitationId);
+    if (!invitation || invitation.status !== "pending") return;
+    await ctx.db.patch(invitation._id, { status: "cancelled", updatedAt: Date.now() });
   },
 });
 
@@ -482,7 +668,19 @@ export const listDepartments = query({
   args: {},
   handler: async (ctx) => {
     await requireStaff(ctx);
-    return await ctx.db.query("departments").take(200);
+    const [departments, profiles, invitations] = await Promise.all([
+      ctx.db.query("departments").take(200),
+      ctx.db.query("userProfiles").take(1000),
+      ctx.db.query("employeeInvitations").filter((q) => q.and(
+        q.eq(q.field("status"), "pending"),
+        q.gt(q.field("expiresAt"), Date.now()),
+      )).take(200),
+    ]);
+    return departments.map((department) => ({
+      ...department,
+      hrLeadName: profiles.find((profile) => profile.departmentId === department._id && profile.role === "hrLead")?.name,
+      pendingHrLeadName: invitations.find((invite) => invite.departmentId === department._id && invite.role === "hrLead")?.name,
+    }));
   },
 });
 
@@ -539,6 +737,56 @@ export const updateProfileAssignment = mutation({
     }
     if ((actorRole === "hr" || actorRole === "hrLead") && args.role !== target.role) {
       throw new ConvexError("HR lead cannot change roles.");
+    }
+    if (args.role === "hrLead") {
+      if (!args.departmentId) throw new ConvexError("An HR Lead must be assigned to a department.");
+      const department = await ctx.db.get(args.departmentId);
+      if (!department) throw new ConvexError("Choose an existing department for the HR Lead.");
+      const departmentProfiles = await ctx.db.query("userProfiles")
+        .withIndex("by_department", (q) => q.eq("departmentId", args.departmentId))
+        .take(200);
+      if (target.role === "hrLead" && target.departmentId && target.departmentId !== args.departmentId) {
+        const oldDepartmentId = target.departmentId;
+        const oldDepartmentProfiles = await ctx.db.query("userProfiles")
+          .withIndex("by_department", (q) => q.eq("departmentId", oldDepartmentId))
+          .take(200);
+        const oldDepartmentInvites = await ctx.db.query("employeeInvitations")
+          .withIndex("by_department_status", (q) => q.eq("departmentId", oldDepartmentId).eq("status", "pending"))
+          .filter((q) => q.and(q.eq(q.field("role"), "hrLead"), q.gt(q.field("expiresAt"), Date.now())))
+          .take(1);
+        if (!oldDepartmentProfiles.some((profile) => profile._id !== target._id && profile.role === "hrLead") && oldDepartmentInvites.length === 0) {
+          throw new ConvexError("Invite a replacement HR Lead before moving this department’s lead.");
+        }
+      }
+      for (const previousLead of departmentProfiles.filter((profile) => profile._id !== target._id && profile.role === "hrLead")) {
+        await ctx.db.patch(previousLead._id, { role: "user", updatedAt: Date.now() });
+      }
+    } else if (target.role === "hrLead" && target.departmentId) {
+      const targetDepartmentId = target.departmentId;
+      const departmentProfiles = await ctx.db.query("userProfiles")
+        .withIndex("by_department", (q) => q.eq("departmentId", targetDepartmentId))
+        .take(200);
+      const pendingLeads = await ctx.db.query("employeeInvitations")
+        .withIndex("by_department_status", (q) => q.eq("departmentId", targetDepartmentId).eq("status", "pending"))
+        .filter((q) => q.and(q.eq(q.field("role"), "hrLead"), q.gt(q.field("expiresAt"), Date.now())))
+        .take(1);
+      if (!departmentProfiles.some((profile) => profile._id !== target._id && profile.role === "hrLead") && pendingLeads.length === 0) {
+        throw new ConvexError("Invite a replacement HR Lead before removing the current department lead.");
+      }
+    }
+    if (args.role !== "hrLead" && args.departmentId) {
+      const departmentId = args.departmentId;
+      const departmentProfiles = await ctx.db.query("userProfiles")
+        .withIndex("by_department", (q) => q.eq("departmentId", departmentId))
+        .take(200);
+      const activeLead = departmentProfiles.some((profile) => profile._id !== target._id && profile.role === "hrLead");
+      const pendingLeads = await ctx.db.query("employeeInvitations")
+        .withIndex("by_department_status", (q) => q.eq("departmentId", departmentId).eq("status", "pending"))
+        .filter((q) => q.and(q.eq(q.field("role"), "hrLead"), q.gt(q.field("expiresAt"), Date.now())))
+        .take(1);
+      if (!activeLead && pendingLeads.length === 0) {
+        throw new ConvexError("Invite this department’s HR Lead before assigning employees to it.");
+      }
     }
 
     let assignedEmail: string | undefined;

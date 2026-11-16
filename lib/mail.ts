@@ -127,6 +127,8 @@ export function folderLabel(folder: FolderKey): string {
       return "Starred";
     case "sent":
       return "Sent";
+    case "department_sent":
+      return "Department sent";
     case "drafts":
       return "Drafts";
     case "trash":

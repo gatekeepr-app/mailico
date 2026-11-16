@@ -91,6 +91,10 @@ async function requireVisibleMessage(
   const isAdmin = profile.role === "admin" &&
     (!settings || settings.ownerAuthUserId === user._id);
   if (isAdmin || message.senderUserId === user._id) return message;
+  if (profile.role === "hrLead" && profile.departmentId) {
+    const senderProfile = await getProfile(ctx, message.senderUserId);
+    if (senderProfile?.departmentId === profile.departmentId) return message;
+  }
   const ownerKeys = inboxOwnerEmails(profile).map(emailKey);
 
   const entry = await ctx.db
@@ -111,6 +115,7 @@ export const listMailboxEntries = query({
       v.literal("sent"),
       v.literal("starred"),
       v.literal("trash"),
+      v.literal("department_sent"),
     ),
     paginationOpts: paginationOptsValidator,
   },
@@ -125,6 +130,32 @@ export const listMailboxEntries = query({
     const settings = await getCompanySettings(ctx);
     const isAdmin = profile.role === "admin" &&
       (!settings || settings.ownerAuthUserId === user._id);
+
+    if (args.folder === "department_sent") {
+      if (profile.role !== "hrLead" || !profile.departmentId) {
+        throw new ConvexError("Department sent mail is available only to an assigned department HR Lead.");
+      }
+      const result = await ctx.db.query("mailboxEntries")
+        .withIndex("by_owner_folder_createdAt", (q) =>
+          q.eq("ownerKey", `department:${profile.departmentId}`).eq("folder", "sent"),
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+      const activeDepartmentEntries = (await Promise.all(result.page.map(async (entry) => {
+        const message = await ctx.db.get(entry.messageId);
+        if (!message) return null;
+        const senderProfile = await getProfile(ctx, message.senderUserId);
+        return senderProfile?.departmentId === profile.departmentId ? entry : null;
+      }))).filter((entry) => entry !== null);
+      const visible = await attachMailboxState(ctx, user._id, activeDepartmentEntries);
+      return {
+        ...result,
+        page: visible.filter((entry) => !entry.trashed).map((entry) => ({
+          ...entry,
+          folder: "department_sent" as const,
+        })),
+      };
+    }
 
     if (args.folder === "starred" || args.folder === "trash") {
       const statePage = args.folder === "starred"
@@ -458,6 +489,14 @@ export const recordSentMessage = internalMutation({
       folder: "inbox",
       ...listFields,
     });
+
+    if (profile.departmentId) {
+      await ctx.db.insert("mailboxEntries", {
+        ownerKey: `department:${profile.departmentId}`,
+        folder: "sent",
+        ...listFields,
+      });
+    }
 
     for (const [kind, recipients] of [
       ["to", to],

@@ -159,6 +159,7 @@ export default function MailApp() {
       sent: allEmails.filter((e) => e.folder === "sent").length,
       drafts: allEmails.filter((e) => e.folder === "drafts").length,
       trash: allEmails.filter((e) => e.folder === "trash").length,
+      department_sent: allEmails.filter((e) => e.folder === "department_sent").length,
     };
   }, [allEmails]);
 
@@ -354,7 +355,7 @@ export default function MailApp() {
       const thread = groupEmailsIntoThreads(allEmails)
         .find((candidate) => candidate.messages.some((message) => message.id === email.id));
       for (const message of thread?.messages ?? [email]) {
-        if (message.folder !== "sent" && !message.read) {
+        if (message.folder !== "sent" && message.folder !== "department_sent" && !message.read) {
           void setMailboxState({
             messageId: message.id as Id<"messages">,
             field: "read",
@@ -529,6 +530,7 @@ export default function MailApp() {
             onCompose={() => openCompose()}
             onClose={() => setNavOpen(false)}
             mailDomain={profileData?.companySettings?.domain ?? ""}
+            canViewDepartmentSent={profileData?.profile?.role === "hrLead" && Boolean(profileData.profile.departmentId)}
           />
         </div>
 
@@ -544,6 +546,7 @@ export default function MailApp() {
               }}
               onClose={() => setNavOpen(false)}
               mailDomain={profileData?.companySettings?.domain ?? ""}
+              canViewDepartmentSent={profileData?.profile?.role === "hrLead" && Boolean(profileData.profile.departmentId)}
               mobileDrawer
             />
             <button aria-label="Close navigation" className="min-w-0 flex-1 bg-black/40" onClick={() => setNavOpen(false)} />

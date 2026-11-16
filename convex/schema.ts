@@ -121,6 +121,26 @@ export default defineSchema({
     .index("by_auth_user_createdAt", ["authUserId", "createdAt"])
     .index("by_status_createdAt", ["status", "createdAt"]),
 
+  employeeInvitations: defineTable({
+    name: v.string(),
+    accountEmail: v.string(),
+    accountEmailNormalized: v.string(),
+    assignedEmail: v.string(),
+    departmentId: v.id("departments"),
+    role: v.union(v.literal("user"), v.literal("hrLead")),
+    invitedByAuthUserId: v.string(),
+    tokenHash: v.string(),
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("cancelled")),
+    expiresAt: v.number(),
+    acceptedAuthUserId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_email_status", ["accountEmailNormalized", "status"])
+    .index("by_assigned_email_status", ["assignedEmail", "status"])
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_department_status", ["departmentId", "status"]),
+
   drafts: defineTable({
     draftKey: v.string(),
     ownerUserId: v.string(),

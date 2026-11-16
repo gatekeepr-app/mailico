@@ -8,6 +8,7 @@ import {
   Trash2,
   Pencil,
   X,
+  Building2,
 } from "lucide-react";
 import { folderLabel } from "@/lib/mail";
 import type { FolderKey } from "@/lib/types";
@@ -20,6 +21,7 @@ interface SidebarProps {
   onClose: () => void;
   mailDomain: string;
   mobileDrawer?: boolean;
+  canViewDepartmentSent?: boolean;
 }
 
 const NAV_ITEMS: { key: FolderKey; icon: typeof Inbox }[] = [
@@ -38,6 +40,7 @@ export default function Sidebar({
   onClose,
   mailDomain,
   mobileDrawer = false,
+  canViewDepartmentSent = false,
 }: SidebarProps) {
   return (
     <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64"} shrink-0 border-r border-gray-200 bg-white`}>
@@ -66,7 +69,7 @@ export default function Sidebar({
       </div>
 
       <nav className="mt-2 space-y-1 px-2 md:px-3">
-        {NAV_ITEMS.map(({ key, icon: Icon }) => {
+        {[...NAV_ITEMS, ...(canViewDepartmentSent ? [{ key: "department_sent" as const, icon: Building2 }] : [])].map(({ key, icon: Icon }) => {
           const active = key === current;
           const count = counts[key];
           return (

@@ -1,9 +1,11 @@
 import { betterAuth } from "better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { createClient, type GenericCtx } from "@convex-dev/better-auth";
+import { APIError } from "better-auth/api";
 import { query } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
+import type { GenericActionCtx } from "convex/server";
 import authConfig from "./auth.config";
 
 const MAIL_DOMAIN = "mail.darvizlabs.online";
@@ -111,6 +113,7 @@ async function sendVerificationEmail({
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
+  const actionCtx = ctx as GenericActionCtx<DataModel>;
   return betterAuth({
     appName: "Mailico",
     baseURL: process.env.SITE_URL,
@@ -119,13 +122,30 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
       sendResetPassword: sendResetPasswordEmail,
     },
     emailVerification: {
       sendOnSignUp: true,
+      sendOnSignIn: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail,
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            const allowed = await actionCtx.runQuery(internal.profiles.canCreateAccountInternal, {
+              emailNormalized: user.email.trim().toLowerCase(),
+            });
+            if (!allowed) {
+              throw new APIError("FORBIDDEN", {
+                message: "Mailico accounts are created through employee invitations.",
+              });
+            }
+          },
+        },
+      },
     },
     plugins: [convex({ authConfig })],
   });

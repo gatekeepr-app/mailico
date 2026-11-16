@@ -105,9 +105,12 @@ export function PushNotificationsControl() {
         return;
       }
 
+      const publicKey = config?.publicKey;
+      if (!publicKey) throw new Error("Push notifications are not configured yet.");
+
       const subscription = existing ?? await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: decodeApplicationServerKey(config.publicKey),
+          applicationServerKey: decodeApplicationServerKey(publicKey),
         });
       const data = subscription.toJSON();
       if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) {

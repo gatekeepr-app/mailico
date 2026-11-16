@@ -35,6 +35,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { Doc } from "@/convex/_generated/dataModel";
+import EmployeeInvitePanel from "@/components/EmployeeInvitePanel";
 
 type ProfileRole = "admin" | "chief" | "hrLead" | "hr" | "user";
 type ProfileWithDepartment = Doc<"userProfiles"> & {
@@ -216,8 +217,15 @@ export default function AdminPanel() {
                   ) : (
                     <ul className="divide-y">
                       {departments.map((department) => (
-                        <li key={department._id} className="px-3 py-2 text-sm font-medium">
-                          {department.name}
+                        <li key={department._id} className="px-3 py-2 text-sm">
+                          <p className="font-medium">{department.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {department.hrLeadName
+                              ? `HR Lead: ${department.hrLeadName}`
+                              : department.pendingHrLeadName
+                                ? `HR Lead invitation pending: ${department.pendingHrLeadName}`
+                                : "No HR Lead assigned"}
+                          </p>
                         </li>
                       ))}
                     </ul>
@@ -228,6 +236,9 @@ export default function AdminPanel() {
           </Card>
 
           <div className="space-y-6">
+          {me?.companySettings?.isOwner && (
+            <EmployeeInvitePanel domain={me.companySettings.domain} departments={departments ?? []} />
+          )}
           {me?.companySettings?.isOwner && (
             <Card>
               <CardHeader>

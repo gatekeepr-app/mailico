@@ -1,4 +1,4 @@
-export type FolderKey = "inbox" | "starred" | "sent" | "drafts" | "trash";
+export type FolderKey = "inbox" | "starred" | "sent" | "department_sent" | "drafts" | "trash";
 
 export interface Email {
   id: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { Star, Trash2, FileText, Archive } from "lucide-react";
-import { formatMailboxName, formatTimestamp, groupEmailsIntoThreads, snippet } from "@/lib/mail";
+import { formatMailboxName, formatTimestamp, groupEmailsIntoThreads, snippet, folderLabel } from "@/lib/mail";
 import type { Email, FolderKey } from "@/lib/types";
 
 interface EmailListProps {
@@ -159,7 +159,7 @@ function EmptyState({ folder }: { folder: FolderKey }) {
       ) : (
         <FileText className="h-10 w-10" />
       )}
-      <p className="text-sm">No {folder === "inbox" ? "messages" : folder} here</p>
+      <p className="text-sm">{folder === "inbox" ? "No messages here" : `No ${folderLabel(folder).toLowerCase()} messages here`}</p>
     </div>
   );
 }
