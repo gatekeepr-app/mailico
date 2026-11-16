@@ -43,11 +43,11 @@ export default function Sidebar({
   canViewDepartmentSent = false,
 }: SidebarProps) {
   return (
-    <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64"} shrink-0 border-r border-gray-200 bg-white`}>
+    <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
       <div className="flex items-center justify-between p-3 md:px-4">
         <button
           onClick={onCompose}
-          className={`${mobileDrawer ? "flex" : "hidden md:flex"} min-h-11 items-center gap-2 rounded-full bg-[#c2e7ff] px-5 py-3 text-sm font-medium text-gray-900 shadow-sm transition hover:bg-[#b1dffb]`}
+          className={`${mobileDrawer ? "flex" : "hidden md:flex"} min-h-11 items-center gap-2 rounded-full bg-[#dcebe2] px-5 py-3 text-sm font-semibold text-[#245b49] shadow-sm transition hover:bg-[#cfe3d7]`}
         >
           <Pencil className="h-5 w-5" />
           Compose
@@ -55,14 +55,14 @@ export default function Sidebar({
         <button
           onClick={onCompose}
           aria-label="Compose"
-          className={`${mobileDrawer ? "hidden" : "md:hidden"} min-h-11 min-w-11 rounded-full bg-[#c2e7ff] p-3 text-gray-900 transition hover:bg-[#b1dffb]`}
+          className={`${mobileDrawer ? "hidden" : "md:hidden"} min-h-11 min-w-11 rounded-full bg-[#dcebe2] p-3 text-[#245b49] transition hover:bg-[#cfe3d7]`}
         >
           <Pencil className="h-5 w-5" />
         </button>
         <button
           onClick={onClose}
           aria-label="Close navigation"
-          className={`${mobileDrawer ? "" : "md:hidden"} min-h-11 min-w-11 rounded-full p-2 text-gray-500 hover:bg-gray-100`}
+          className={`${mobileDrawer ? "" : "md:hidden"} min-h-11 min-w-11 rounded-full p-2 text-[#718078] hover:bg-[#f0f4f1]`}
         >
           <X className="h-5 w-5" />
         </button>
@@ -78,8 +78,8 @@ export default function Sidebar({
               onClick={() => onNavigate(key)}
               className={`flex min-h-11 w-full items-center gap-4 rounded-r-full px-4 py-2.5 text-sm font-medium transition ${
                 active
-                  ? "bg-[#d3e3fd] text-gray-900"
-                  : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-[#e4efe8] text-[#245b49]"
+                  : "text-[#46564e] hover:bg-[#f0f4f1]"
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
@@ -103,7 +103,7 @@ export default function Sidebar({
       <div className={`${mobileDrawer ? "block" : "hidden md:block"} mt-8 break-all px-7 text-xs leading-relaxed text-gray-400`}>
         Sending from
         <br />
-        <span className="font-medium text-gray-600">
+        <span className="font-medium text-[#52635b]">
           *@{mailDomain}
         </span>
       </div>

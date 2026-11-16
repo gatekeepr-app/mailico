@@ -31,11 +31,11 @@ export default function TopBar({
   const avatarName = userName ?? userEmail;
 
   return (
-    <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-2 py-2 md:h-16 md:flex-nowrap md:px-4 md:py-0">
+    <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b border-[#e3e9e4] bg-white px-2 py-2 md:h-16 md:flex-nowrap md:px-4 md:py-0">
       <button
         onClick={onOpenNav}
         aria-label="Open navigation"
-        className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100 md:hidden"
+        className="min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1] md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -45,20 +45,20 @@ export default function TopBar({
         aria-label="Mailico home"
         className="flex items-center gap-2 px-1 md:px-2"
       >
-        <Mail className="h-6 w-6 text-[#0b57d0]" />
-        <span className="hidden text-lg font-medium text-gray-800 lg:block">
+        <Mail className="h-6 w-6 text-[#286653]" />
+        <span className="hidden text-lg font-semibold tracking-[-0.03em] text-[#24352e] lg:block">
           Mailico
         </span>
       </button>
 
-      <div className="relative order-last w-full min-w-0 md:order-none md:mx-auto md:flex-1 md:max-w-xl">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+      <div className="relative order-last w-full min-w-0 md:order-none md:mx-auto md:flex-1 md:max-w-[56rem]">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718078]" />
         <input
           type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search mail"
-          className="w-full rounded-full border border-transparent bg-[#eaf1fb] py-2.5 pl-11 pr-4 text-sm text-gray-900 outline-none transition focus:border-[#0b57d0] focus:bg-white focus:shadow-sm"
+          className="w-full rounded-full border border-transparent bg-[#edf3ef] py-2.5 pl-11 pr-4 text-sm text-[#24352e] outline-none transition placeholder:text-[#718078] focus:border-[#9bb9aa] focus:bg-white focus:ring-2 focus:ring-[#286653]/10"
         />
       </div>
 
@@ -66,7 +66,7 @@ export default function TopBar({
       <button
         onClick={onRefresh}
         aria-label="Refresh"
-        className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
+        className="min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1]"
       >
         <RefreshCw className="h-5 w-5" />
       </button>
@@ -77,7 +77,7 @@ export default function TopBar({
       {isStaff && (
         <Link
           href="/admin"
-          className="hidden rounded-full px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 md:block"
+          className="hidden rounded-full px-3 py-2 text-sm font-medium text-[#52635b] hover:bg-[#f0f4f1] md:block"
         >
           Admin
         </Link>
@@ -89,7 +89,7 @@ export default function TopBar({
           <button
             onClick={onSignOut}
             aria-label="Sign out"
-            className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
+            className="min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1]"
           >
             <LogOut className="h-5 w-5" />
           </button>

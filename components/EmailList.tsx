@@ -45,17 +45,17 @@ export default function EmailList({
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       {hasSelection && (
-        <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
+        <div className="flex items-center gap-2 border-b border-[#e3e9e4] bg-white px-4 py-2">
           <button
             onClick={onDeleteSelected}
-            className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+            className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-[#46564e] hover:bg-[#f0f4f1]"
           >
             <Trash2 className="h-4 w-4" />
             Delete
           </button>
           <button
             onClick={onClearSelection}
-            className="ml-auto rounded-md px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+            className="ml-auto rounded-md px-3 py-1.5 text-sm text-[#718078] hover:bg-[#f0f4f1]"
           >
             Cancel
           </button>
@@ -67,7 +67,7 @@ export default function EmailList({
         {emails.length === 0 ? (
           <EmptyState folder={folder} />
         ) : (
-          <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-[#edf1ed]">
             {threads.map((thread) => {
               const email = thread.latest;
               const contextMessages = threadContextByKey.get(thread.key)?.messages ?? thread.messages;
@@ -84,12 +84,12 @@ export default function EmailList({
                 <li key={thread.key}>
                   <div
                     onClick={() => onOpen(email)}
-                    className={`grid min-w-0 cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 border-b border-gray-100 px-2 py-2.5 transition hover:shadow-sm sm:px-4 ${
+                    className={`grid min-w-0 cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 border-b border-[#edf1ed] px-2 py-2.5 transition-colors hover:bg-[#f5f8f5] sm:px-4 ${
                       active
-                        ? "bg-[#d3e3fd]"
+                        ? "border-l-2 border-l-[#286653] bg-[#e8f1eb]"
                         : !unread
                           ? "bg-white"
-                          : "bg-[#f2f6fc]"
+                          : "bg-[#f5f8f5]"
                     }`}
                   >
                     <input
@@ -97,7 +97,7 @@ export default function EmailList({
                       checked={allSelected}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => onToggleSelectMany(threadIds)}
-                      className="col-start-1 row-span-2 mx-auto h-5 w-5 shrink-0 accent-[#0b57d0]"
+                      className="col-start-1 row-span-2 mx-auto h-5 w-5 shrink-0 accent-[#286653]"
                       aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
                     />
                     <button
@@ -112,7 +112,7 @@ export default function EmailList({
                         className={`h-5 w-5 ${
                           email.starred
                             ? "fill-amber-400 text-amber-400"
-                            : "text-gray-300 hover:text-gray-500"
+                            : "text-[#c6d0c9] hover:text-[#718078]"
                         }`}
                       />
                     </button>
@@ -126,19 +126,19 @@ export default function EmailList({
                         {senderLabel}
                       </span>
                       {contextMessages.length > 1 && (
-                        <span className="shrink-0 rounded-full bg-[#e8eaed] px-1.5 py-0.5 text-[11px] font-medium text-[#5f6368]">
+                        <span className="shrink-0 rounded-full bg-[#e9efeb] px-1.5 py-0.5 text-[11px] font-medium text-[#52635b]">
                           {contextMessages.length}
                         </span>
                       )}
-                      <time className="shrink-0 text-[11px] text-gray-500 sm:text-xs">
+                      <time className="shrink-0 text-[11px] text-[#718078] sm:text-xs">
                         {formatTimestamp(email.createdAt)}
                       </time>
                     </div>
                     <div className="col-start-2 row-start-2 min-w-0 truncate">
-                      <span className={`${!unread ? "text-sm text-gray-600" : "text-sm font-semibold text-gray-900"}`}>
+                      <span className={`${!unread ? "text-sm text-[#52635b]" : "text-sm font-semibold text-[#24352e]"}`}>
                         {email.subject || "(no subject)"}
                       </span>
-                      {email.subject && <span className="ml-2 text-sm text-gray-400">{snippet(email.body, 60)}</span>}
+                      {email.subject && <span className="ml-2 text-sm text-[#87948d]">{snippet(email.body, 60)}</span>}
                     </div>
                   </div>
                 </li>

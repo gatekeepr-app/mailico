@@ -466,7 +466,7 @@ export default function MailApp() {
   const userName = profileData?.profile?.name ?? session?.user?.name ?? null;
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#f5f5f0]">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#f5f7f4]">
       <TopBar
         search={search}
         onSearchChange={setSearch}
@@ -603,16 +603,16 @@ export default function MailApp() {
               />
             </div>
           ) : (
-            <div className="hidden min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-white text-gray-400 md:flex">
-              <EnvelopeSimple size={56} weight="thin" />
-              <p className="text-sm">
+            <div className="hidden min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-[#fbfcfa] text-[#87948d] md:flex">
+              <EnvelopeSimple size={56} weight="thin" className="text-[#aab7af]" />
+              <p className="text-sm text-[#718078]">
                 {searchMatches
                   ? "No messages match your search"
                   : "Select a message to read it"}
               </p>
               <button
                 onClick={() => openCompose()}
-                className="mt-2 rounded-none bg-[#286653] px-4 py-2 text-sm text-white hover:bg-[#1f5544] active:scale-[0.98]"
+                className="mt-2 rounded-full bg-[#286653] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#1f5544] active:scale-[0.98]"
               >
                 Compose
               </button>
@@ -622,7 +622,7 @@ export default function MailApp() {
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
               <button
                 onClick={() => mailboxEntries.loadMore(25)}
-                className="rounded-full border bg-white px-4 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
+                className="rounded-full border border-[#d7e1da] bg-white px-4 py-2 text-sm font-medium text-[#46564e] shadow-sm hover:bg-[#f5f8f5]"
               >
                 Load more
               </button>
