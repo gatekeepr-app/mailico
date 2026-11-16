@@ -11,14 +11,14 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <main className="landing-page overflow-hidden">
+    <main className="landing-page">
       <div className="landing-shell">
         <header className="landing-nav">
           <Link href="/" className="landing-brand" aria-label="Mailico home"><span className="brand-mark"><Mail size={16} strokeWidth={1.7} /></span>mailico</Link>
-          <nav className="hidden items-center gap-8 sm:flex" aria-label="Main navigation">
+          <nav className="landing-menu flex items-center gap-8" aria-label="Main navigation">
             <Link href="#product">Product</Link><Link href="#how-it-works">How it works</Link><Link href="/pricing">Pricing</Link>
           </nav>
-          <div className="flex items-center gap-3"><Link className="nav-signin hidden sm:inline" href="/login">Sign in</Link><Link className="button button-dark nav-cta" href="/register">Get started <ArrowRight size={14} /></Link></div>
+          <div className="flex items-center gap-3"><Link className="nav-signin" href="/login">Sign in</Link><Link className="button button-dark nav-cta" href="/register">Get started <ArrowRight size={14} /></Link></div>
         </header>
 
         <section className="landing-hero">
