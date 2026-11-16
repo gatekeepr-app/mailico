@@ -165,8 +165,9 @@ export default function ComposeModal({
         <div className="flex shrink-0 items-center gap-2 border-t border-gray-100 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-3">
           <button
             onClick={onSend}
-            disabled={sending}
-            className="flex items-center gap-2 rounded-md bg-[#0b57d0] px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#0b4ec0] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={sending || !fromEmail}
+            title={!fromEmail ? "An administrator must assign you a company email before you can send." : undefined}
+            className="flex min-h-11 items-center gap-2 rounded-md bg-[#0b57d0] px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#0b4ec0] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
           >
             <Send className="h-4 w-4" />
             {sending ? "Sending…" : "Send"}
