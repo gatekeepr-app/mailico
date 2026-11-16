@@ -31,11 +31,11 @@ export default function TopBar({
   const avatarName = userName ?? userEmail;
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-2 md:px-4">
+    <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-2 py-2 md:h-16 md:flex-nowrap md:px-4 md:py-0">
       <button
         onClick={onOpenNav}
         aria-label="Open navigation"
-        className="rounded-full p-2.5 text-gray-500 hover:bg-gray-100 md:hidden"
+        className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100 md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -51,7 +51,7 @@ export default function TopBar({
         </span>
       </button>
 
-      <div className="relative mx-auto w-full max-w-xl">
+      <div className="relative order-last w-full min-w-0 md:order-none md:mx-auto md:flex-1 md:max-w-xl">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
@@ -62,10 +62,11 @@ export default function TopBar({
         />
       </div>
 
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 md:ml-0 md:gap-2">
       <button
         onClick={onRefresh}
         aria-label="Refresh"
-        className="rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
+        className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
       >
         <RefreshCw className="h-5 w-5" />
       </button>
@@ -88,12 +89,13 @@ export default function TopBar({
           <button
             onClick={onSignOut}
             aria-label="Sign out"
-            className="rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
+            className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-100"
           >
             <LogOut className="h-5 w-5" />
           </button>
         </div>
       )}
+      </div>
     </header>
   );
 }

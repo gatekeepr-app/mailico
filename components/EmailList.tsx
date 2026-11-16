@@ -84,7 +84,7 @@ export default function EmailList({
                 <li key={thread.key}>
                   <div
                     onClick={() => onOpen(email)}
-                    className={`flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2.5 transition hover:shadow-sm md:px-4 ${
+                    className={`grid min-w-0 cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 border-b border-gray-100 px-2 py-2.5 transition hover:shadow-sm sm:px-4 ${
                       active
                         ? "bg-[#d3e3fd]"
                         : !unread
@@ -97,7 +97,7 @@ export default function EmailList({
                       checked={allSelected}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => onToggleSelectMany(threadIds)}
-                      className="shrink-0 accent-[#0b57d0]"
+                      className="col-start-1 row-span-2 mx-auto h-5 w-5 shrink-0 accent-[#0b57d0]"
                       aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
                     />
                     <button
@@ -106,10 +106,10 @@ export default function EmailList({
                         onToggleStar(email.id);
                       }}
                       aria-label={email.starred ? "Unstar" : "Star"}
-                      className="shrink-0"
+                      className="col-start-1 row-start-2 mx-auto flex min-h-11 min-w-11 items-center justify-center"
                     >
                       <Star
-                        className={`h-4 w-4 ${
+                        className={`h-5 w-5 ${
                           email.starred
                             ? "fill-amber-400 text-amber-400"
                             : "text-gray-300 hover:text-gray-500"
@@ -117,38 +117,28 @@ export default function EmailList({
                       />
                     </button>
 
-                    <div className="flex min-w-0 flex-1 items-baseline gap-3">
+                    <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-2">
                       <span
-                        className={`w-40 shrink-0 truncate text-sm md:w-44 ${
+                        className={`min-w-0 flex-1 truncate text-sm ${
                           unread ? "font-bold text-gray-900" : "text-gray-700"
                         }`}
                       >
                         {senderLabel}
                       </span>
                       {contextMessages.length > 1 && (
-                        <span className="shrink-0 rounded-full bg-[#e8eaed] px-2 py-0.5 text-xs font-medium text-[#5f6368]">
+                        <span className="shrink-0 rounded-full bg-[#e8eaed] px-1.5 py-0.5 text-[11px] font-medium text-[#5f6368]">
                           {contextMessages.length}
                         </span>
                       )}
-                      <span className="flex min-w-0 items-baseline gap-2">
-                        <span
-                          className={`truncate ${
-                            !unread
-                              ? "text-sm text-gray-600"
-                              : "text-sm font-semibold text-gray-900"
-                          }`}
-                        >
-                          {email.subject || "(no subject)"}
-                          {email.subject && (
-                            <span className="ml-2 hidden font-normal text-gray-400 md:inline">
-                              - {snippet(email.body, 60)}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                      <span className="ml-auto shrink-0 pl-3 text-xs text-gray-500">
+                      <time className="shrink-0 text-[11px] text-gray-500 sm:text-xs">
                         {formatTimestamp(email.createdAt)}
+                      </time>
+                    </div>
+                    <div className="col-start-2 row-start-2 min-w-0 truncate">
+                      <span className={`${!unread ? "text-sm text-gray-600" : "text-sm font-semibold text-gray-900"}`}>
+                        {email.subject || "(no subject)"}
                       </span>
+                      {email.subject && <span className="ml-2 text-sm text-gray-400">{snippet(email.body, 60)}</span>}
                     </div>
                   </div>
                 </li>

@@ -498,7 +498,7 @@ export default function MailApp() {
               </div>
             </div>
             {emailAddressRequest?.status !== "pending" && (
-              <form onSubmit={handleRequestEmailAddress} className="flex w-full gap-2 sm:max-w-lg">
+              <form onSubmit={handleRequestEmailAddress} className="flex w-full flex-col gap-2 sm:max-w-lg sm:flex-row">
                 <label htmlFor="request-company-address" className="sr-only">Requested address name</label>
                 <div className="flex min-w-0 flex-1 overflow-hidden border border-[#cbd3cc] bg-white focus-within:ring-2 focus-within:ring-[#347563]/20">
                   <Input
@@ -509,9 +509,9 @@ export default function MailApp() {
                     className="min-w-0 border-0 shadow-none focus-visible:ring-0"
                     required
                   />
-                  <span className="flex items-center border-l border-[#cbd3cc] bg-[#f7f8f4] px-2 text-xs text-[#68746e]">@{profileData.companySettings?.domain}</span>
+                  <span className="flex max-w-[45%] items-center break-all border-l border-[#cbd3cc] bg-[#f7f8f4] px-2 text-[11px] text-[#68746e] sm:max-w-none sm:text-xs">@{profileData.companySettings?.domain}</span>
                 </div>
-                <Button type="submit" disabled={requestingAddress} className="rounded-none bg-[#286653] text-white hover:bg-[#1f5544] active:scale-[0.98]">
+                <Button type="submit" disabled={requestingAddress} className="min-h-11 w-full rounded-none bg-[#286653] text-white hover:bg-[#1f5544] active:scale-[0.98] sm:w-auto">
                   {requestingAddress ? "Sending…" : "Request"}
                 </Button>
               </form>
@@ -534,10 +534,6 @@ export default function MailApp() {
 
         {navOpen && (
           <div className="fixed inset-0 z-30 flex md:hidden">
-            <div
-              className="flex-1 bg-black/40"
-              onClick={() => setNavOpen(false)}
-            />
             <Sidebar
               current={folder}
               counts={counts}
@@ -548,13 +544,15 @@ export default function MailApp() {
               }}
               onClose={() => setNavOpen(false)}
               mailDomain={profileData?.companySettings?.domain ?? ""}
+              mobileDrawer
             />
+            <button aria-label="Close navigation" className="min-w-0 flex-1 bg-black/40" onClick={() => setNavOpen(false)} />
           </div>
         )}
 
         <main className="flex min-h-0 flex-1">
           <div
-            className={`min-h-0 md:flex md:w-[min(420px,40%)] md:flex-col md:border-r md:border-gray-200 ${
+            className={`min-h-0 min-w-0 md:flex md:w-[min(360px,42%)] md:flex-col md:border-r md:border-gray-200 xl:w-[min(420px,40%)] ${
               selected ? "hidden" : "flex w-full flex-col"
             }`}
           >

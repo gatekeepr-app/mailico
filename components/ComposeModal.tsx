@@ -41,9 +41,9 @@ export default function ComposeModal({
   const fullFrom = fromEmail ?? "No assigned sender";
 
   return (
-    <div className="fixed bottom-0 right-0 z-40 w-full max-w-2xl md:bottom-4 md:right-4 md:rounded-2xl md:shadow-2xl">
-      <div className="flex flex-col overflow-hidden bg-white md:rounded-2xl md:border md:border-gray-300">
-        <div className="flex items-center justify-between rounded-t-2xl bg-[#f2f6fc] px-4 py-3">
+    <div className="fixed inset-0 z-40 flex min-h-0 w-full flex-col bg-white pb-[env(safe-area-inset-bottom)] md:inset-auto md:bottom-4 md:right-4 md:max-h-[min(85dvh,48rem)] md:w-[min(42rem,calc(100vw-2rem))] md:rounded-2xl md:bg-transparent md:pb-0 md:shadow-2xl">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white md:rounded-2xl md:border md:border-gray-300">
+        <div className="flex shrink-0 items-center justify-between bg-[#f2f6fc] px-4 py-3 md:rounded-t-2xl">
           <h2 className="text-sm font-medium text-gray-800">
             {compose.draftId ? "Edit draft" : "New Message"}
           </h2>
@@ -51,19 +51,19 @@ export default function ComposeModal({
             onClick={onDiscard}
             disabled={sending}
             aria-label="Discard draft"
-            className="rounded-full p-1.5 text-gray-500 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {error && (
-          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <div className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <div className="divide-y divide-gray-200 px-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain divide-y divide-gray-200 px-4">
           <div className="flex items-center py-2">
             <label className="w-10 text-xs text-gray-500">To</label>
             <div className="flex-1">
@@ -159,10 +159,10 @@ export default function ComposeModal({
           value={compose.body}
           onChange={(e) => onChange({ body: e.target.value })}
           placeholder="Write your message"
-          className="min-h-[220px] w-full resize-none px-4 py-3 text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+          className="min-h-32 w-full shrink-0 resize-none px-4 py-3 text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 md:min-h-[220px] md:flex-1"
         />
 
-        <div className="flex items-center gap-2 px-4 py-3">
+        <div className="flex shrink-0 items-center gap-2 border-t border-gray-100 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-3">
           <button
             onClick={onSend}
             disabled={sending}

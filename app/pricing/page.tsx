@@ -51,14 +51,14 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-[#f7f5ef] px-5 text-[#171a16]">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col">
-        <header className="flex items-center justify-between border-b border-[#171511]/10 py-6">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#171511]/10 py-5 sm:py-6">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
             <span className="flex size-8 items-center justify-center rounded-full bg-[#193e37] text-[#f7f5ef]">
               <Envelope size={16} weight="regular" aria-hidden="true" />
             </span>
             Mailico
           </Link>
-          <nav aria-label="Main navigation" className="flex items-center gap-2">
+          <nav aria-label="Main navigation" className="ml-auto flex flex-wrap items-center justify-end gap-1 sm:gap-2">
             <Button asChild variant="ghost" className="rounded-full">
               <Link href="/login">Sign in</Link>
             </Button>

@@ -156,7 +156,7 @@ export function PushNotificationsControl() {
       title={label}
       disabled={busy || state === "loading"}
       onClick={() => void toggle()}
-      className="rounded-full p-2.5 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
+      className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
     >
       {state === "on" ? <Bell className="h-5 w-5 text-[#286653]" /> : <BellOff className="h-5 w-5" />}
     </button>
@@ -215,7 +215,7 @@ export function PwaInstallControl() {
       aria-label="Install Mailico app"
       title="Install Mailico app"
       onClick={() => void install()}
-      className="rounded-full p-2.5 text-gray-500 transition hover:bg-gray-100"
+      className="min-h-11 min-w-11 rounded-full p-2.5 text-gray-500 transition hover:bg-gray-100"
     >
       {isAppleMobile ? <Smartphone className="h-5 w-5" /> : <Download className="h-5 w-5" />}
     </button>

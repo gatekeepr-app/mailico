@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Trash2, Pencil, ArrowLeft } from "lucide-react";
+import { Star, Trash2, Pencil, ArrowLeft, Archive, Mail } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { formatAddresses, formatMailboxAddress, formatTimestamp, snippet } from "@/lib/mail";
 import type { Email } from "@/lib/types";
@@ -35,11 +35,11 @@ export default function EmailView({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-white">
-      <div className="flex items-center gap-1 border-b border-gray-200 px-3 py-2">
+      <div className="flex min-h-14 flex-wrap items-center gap-1 border-b border-gray-200 px-2 py-1.5 sm:px-3">
         <button
           onClick={onBack}
           aria-label="Back"
-          className="rounded-full p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+          className="min-h-11 min-w-11 rounded-full p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -47,7 +47,7 @@ export default function EmailView({
         <button
           onClick={() => onToggleStar(email.id)}
           aria-label={email.starred ? "Unstar" : "Star"}
-          className="rounded-full p-2 text-gray-600 hover:bg-gray-100"
+          className="min-h-11 min-w-11 rounded-full p-2 text-gray-600 hover:bg-gray-100"
         >
           <Star className={`h-5 w-5 ${email.starred ? "fill-amber-400 text-amber-400" : ""}`} />
         </button>
@@ -64,15 +64,17 @@ export default function EmailView({
           <>
             <button
               onClick={() => onMarkUnread(email.id)}
-              className="hidden rounded-md px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 md:block"
+              aria-label="Mark unread"
+              className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-sm text-gray-700 hover:bg-gray-100 sm:px-3"
             >
-              Mark unread
+              <Mail className="h-5 w-5" /><span className="hidden sm:inline">Mark unread</span>
             </button>
             <button
               onClick={() => onDelete(email.id)}
-              className="rounded-md px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              aria-label="Archive"
+              className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-sm text-gray-700 hover:bg-gray-100 sm:px-3"
             >
-              Archive
+              <Archive className="h-5 w-5" /><span className="hidden sm:inline">Archive</span>
             </button>
           </>
         )}
@@ -80,14 +82,14 @@ export default function EmailView({
         <button
           onClick={() => onDelete(email.id)}
           aria-label="Delete"
-          className="ml-auto rounded-full p-2 text-gray-600 hover:bg-gray-100"
+          className="ml-auto min-h-11 min-w-11 rounded-full p-2 text-gray-600 hover:bg-gray-100"
         >
           <Trash2 className="h-5 w-5" />
         </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
-        <h1 className="text-xl font-normal text-gray-900 md:text-2xl">
+        <h1 className="break-words text-xl font-normal text-gray-900 md:text-2xl">
           {email.subject || "(no subject)"}
         </h1>
         {messages.length > 1 && (
@@ -99,23 +101,23 @@ export default function EmailView({
         <div className="mt-5 divide-y divide-gray-200 rounded-xl border border-gray-200">
           {messages.map((message) => message.id === email.id ? (
             <article key={message.id} className="p-4 md:p-5">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 flex-wrap items-start gap-3">
                 <Avatar name={email.fromName || email.from} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-900">
+                  <p className="break-words text-sm text-gray-900 [overflow-wrap:anywhere]">
                     {formatMailboxAddress(email.from, email.fromName)}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
                     To: {formatAddresses(email.to) || "-"}
                     {email.cc.length > 0 && <> · Cc: {formatAddresses(email.cc)}</>}
                     {email.bcc.length > 0 && <> · Bcc: {formatAddresses(email.bcc)}</>}
                   </p>
                 </div>
-                <time className="shrink-0 text-xs text-gray-500">
+                <time className="ml-auto shrink-0 text-xs text-gray-500">
                   {new Date(email.createdAt).toLocaleString()}
                 </time>
               </div>
-              <div className="mt-5 whitespace-pre-wrap text-[15px] leading-relaxed text-gray-800">
+              <div className="mt-5 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-gray-800 [overflow-wrap:anywhere]">
                 {email.body}
               </div>
             </article>

@@ -9,7 +9,7 @@ export default async function ChangelogPage() {
 
   return (
     <main className="min-h-screen bg-muted/40 px-4 py-10 text-foreground">
-      <article className="mx-auto max-w-4xl rounded-2xl border bg-background p-6 shadow-sm md:p-10">
+      <article className="mx-auto max-w-4xl min-w-0 rounded-2xl border bg-background p-4 shadow-sm sm:p-6 md:p-10">
         <div className="mb-8">
           <p className="text-sm font-medium text-muted-foreground">Mailico</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -48,7 +48,7 @@ export default async function ChangelogPage() {
               return <div key={index} className="h-2" />;
             }
             return (
-              <p key={index} className="text-sm leading-6 text-muted-foreground">
+              <p key={index} className="break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
                 {line}
               </p>
             );
