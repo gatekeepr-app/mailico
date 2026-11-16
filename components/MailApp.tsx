@@ -522,7 +522,7 @@ export default function MailApp() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="hidden md:flex">
+        <div className={selected ? "hidden" : "hidden md:flex"}>
           <Sidebar
             current={folder}
             counts={counts}
@@ -555,9 +555,7 @@ export default function MailApp() {
 
         <main className="flex min-h-0 flex-1">
           <div
-            className={`min-h-0 min-w-0 md:flex md:w-[min(360px,42%)] md:flex-col md:border-r md:border-gray-200 xl:w-[min(420px,40%)] ${
-              selected ? "hidden" : "flex w-full flex-col"
-            }`}
+            className={`min-h-0 min-w-0 ${selected ? "hidden" : "flex w-full flex-col md:w-[min(360px,42%)] md:border-r md:border-gray-200 xl:w-[min(420px,40%)]"}`}
           >
             <EmailList
               emails={filtered}
@@ -584,7 +582,7 @@ export default function MailApp() {
           </div>
 
           {selected ? (
-            <div className="min-w-0 flex-1 md:flex">
+            <div className="flex min-h-0 min-w-0 flex-1">
               <EmailView
                 email={selectedForView ?? selected}
                 threadMessages={selectedThreadMessages}

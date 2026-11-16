@@ -39,9 +39,9 @@ export default function EmailView({
         <button
           onClick={onBack}
           aria-label="Back"
-          className="min-h-11 min-w-11 rounded-full p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+          className="flex min-h-11 min-w-11 items-center gap-2 rounded-full px-3 text-gray-600 hover:bg-gray-100"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" /><span className="text-sm">Back to list</span>
         </button>
 
         <button
