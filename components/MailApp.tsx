@@ -162,6 +162,18 @@ export default function MailApp() {
     };
   }, [allEmails]);
 
+  useEffect(() => {
+    const badgeNavigator = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if ((counts.inbox > 0 || mailboxEntries.status === "CanLoadMore") && badgeNavigator.setAppBadge) {
+      void badgeNavigator.setAppBadge().catch(() => undefined);
+    } else if (counts.inbox === 0 && mailboxEntries.status === "Exhausted" && badgeNavigator.clearAppBadge) {
+      void badgeNavigator.clearAppBadge().catch(() => undefined);
+    }
+  }, [counts.inbox, mailboxEntries.status]);
+
   const selected = useMemo(
     () => allEmails.find((e) => e.id === selectedId) ?? null,
     [allEmails, selectedId],
@@ -443,6 +455,8 @@ export default function MailApp() {
   }, [requestEmailAddress, requestLocalPart]);
 
   const handleSignOut = useCallback(() => {
+    const badgeNavigator = navigator as Navigator & { clearAppBadge?: () => Promise<void> };
+    if (badgeNavigator.clearAppBadge) void badgeNavigator.clearAppBadge().catch(() => undefined);
     router.push("/logout");
   }, [router]);
 

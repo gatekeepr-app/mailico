@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { getToken } from "@/lib/auth-server";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaRegistrar } from "@/components/PwaRegistrar";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -18,7 +19,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mailico",
   description: "Set up and manage your organization's company mail",
+  applicationName: "Mailico",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Mailico",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
 };
+
+export const viewport: Viewport = { themeColor: "#286653" };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const token = await getToken();
@@ -28,6 +39,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <PwaRegistrar />
         <ConvexClientProvider initialToken={token}>{children}</ConvexClientProvider>
         <Toaster />
       </body>

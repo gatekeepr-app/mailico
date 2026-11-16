@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { authComponent } from "./auth";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -564,6 +565,41 @@ export const recordInboundMessage = internalMutation({
           ...listFields,
         });
       }
+    }
+
+    const settings = await getCompanySettings(ctx);
+    const recipientEmails = uniqueLowercase([...to, ...cc, ...bcc]);
+    const recipientUserIds = new Set<string>();
+    if (settings?.ownerAuthUserId) recipientUserIds.add(settings.ownerAuthUserId);
+
+    for (const email of recipientEmails) {
+      const [assignedProfiles, accountProfiles] = await Promise.all([
+        ctx.db.query("userProfiles")
+          .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", email))
+          .take(25),
+        ctx.db.query("userProfiles")
+          .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", email))
+          .take(25),
+      ]);
+      for (const profile of [...assignedProfiles, ...accountProfiles]) {
+        recipientUserIds.add(profile.authUserId);
+      }
+    }
+
+    const subscriptions = (await Promise.all(
+      [...recipientUserIds].map((authUserId) =>
+        ctx.db.query("pushSubscriptions")
+          .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+          .take(20),
+      ),
+    )).flat().slice(0, 100).map(({ endpoint, p256dh, auth }) => ({
+      endpoint,
+      keys: { p256dh, auth },
+    }));
+
+    if (subscriptions.length && process.env.VAPID_PUBLIC_KEY &&
+      process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
+      await ctx.scheduler.runAfter(0, internal.push.sendNewMail, { subscriptions });
     }
 
     return messageId;

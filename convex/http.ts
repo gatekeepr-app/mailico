@@ -114,7 +114,7 @@ http.route({
     }
 
     try {
-      const messageId = await ctx.runMutation(
+      const result = await ctx.runMutation(
         internal.mail.recordInboundMessage,
         payload as {
           resendId?: string;
@@ -128,10 +128,31 @@ http.route({
           body: string;
         },
       );
-      return Response.json({ ok: true, messageId });
+      return Response.json({ ok: true, messageId: result });
     } catch {
       return Response.json({ error: "Invalid inbound email payload." }, { status: 400 });
     }
+  }),
+});
+
+http.route({
+  path: "/notifications/config",
+  method: "GET",
+  handler: httpAction(async (_ctx, request) => {
+    const secret = process.env.MAILICO_INTERNAL_SECRET;
+    if (!secret) return Response.json({ error: "Notification configuration is not available." }, { status: 503 });
+    if (request.headers.get("x-mailico-secret") !== secret) {
+      return Response.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!publicKey || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) {
+      return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
+    return Response.json(
+      { enabled: true, publicKey },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
   }),
 });
 

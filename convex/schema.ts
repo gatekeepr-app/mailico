@@ -32,6 +32,7 @@ export default defineSchema({
   userProfiles: defineTable({
     authUserId: v.string(),
     accountEmail: v.string(),
+    accountEmailNormalized: v.optional(v.string()),
     name: v.string(),
     role: v.union(
       v.literal("admin"),
@@ -46,6 +47,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_auth_user", ["authUserId"])
+    .index("by_account_email_normalized", ["accountEmailNormalized"])
     .index("by_assigned_email", ["assignedEmail"])
     .index("by_updatedAt", ["updatedAt"])
     .index("by_department", ["departmentId"]),
@@ -133,4 +135,15 @@ export default defineSchema({
   })
     .index("by_owner_updatedAt", ["ownerUserId", "updatedAt"])
     .index("by_owner_draftKey", ["ownerUserId", "draftKey"]),
+
+  pushSubscriptions: defineTable({
+    authUserId: v.string(),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_auth_user", ["authUserId"])
+    .index("by_endpoint", ["endpoint"]),
 });

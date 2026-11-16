@@ -98,11 +98,13 @@ export const ensureCurrentProfile = mutation({
         : existing.role === "admin" ? "user" : existing.role;
       if (
         existing.accountEmail !== user.email ||
+        existing.accountEmailNormalized !== user.email.toLowerCase() ||
         existing.name !== name ||
         existing.role !== role
       ) {
         await ctx.db.patch(existing._id, {
           accountEmail: user.email,
+          accountEmailNormalized: user.email.toLowerCase(),
           name,
           role,
           updatedAt: now,
@@ -117,6 +119,7 @@ export const ensureCurrentProfile = mutation({
     const profileId = await ctx.db.insert("userProfiles", {
       authUserId: user._id,
       accountEmail: user.email,
+      accountEmailNormalized: user.email.toLowerCase(),
       name: user.name || user.email.split("@")[0],
       role,
       createdAt: now,
@@ -154,6 +157,7 @@ export const completeCompanySetupInternal = internalMutation({
     if (profile) {
       await ctx.db.patch(profile._id, {
         role: "admin",
+        accountEmailNormalized: profile.accountEmail.toLowerCase(),
         assignedEmail: ownerAddress,
         updatedAt: now,
       });
@@ -161,6 +165,7 @@ export const completeCompanySetupInternal = internalMutation({
       await ctx.db.insert("userProfiles", {
         authUserId: args.ownerAuthUserId,
         accountEmail: args.ownerEmail,
+        accountEmailNormalized: args.ownerEmail.toLowerCase(),
         name: args.ownerName || args.ownerEmail.split("@")[0],
         role: "admin",
         assignedEmail: ownerAddress,

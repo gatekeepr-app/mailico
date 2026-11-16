@@ -275,5 +275,6 @@ export async function POST(req: Request) {
       { status: response.status },
     );
   }
-  return Response.json(result);
+
+  return Response.json({ ok: true });
 }

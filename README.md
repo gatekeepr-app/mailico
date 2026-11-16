@@ -10,6 +10,7 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
 - Deterministic fallback avatars use stable name-derived initials and HSL gradients when no profile photo is available.
 - Drafts auto-save while you compose and can be reopened to edit.
 - Sent and received emails are recorded in Convex so users can review matching mailbox entries.
+- Installable PWA with a private offline fallback, unread app icon badges, and opt-in push notifications for new inbound mail.
 
 ## Setup
 
@@ -64,6 +65,21 @@ RESEND_WEBHOOK_SECRET=...
 MAILICO_INTERNAL_SECRET=...
 MAILICO_OWNER_SETUP_TOKEN=...
 ```
+
+Generate a VAPID key pair with `pnpm exec web-push generate-vapid-keys` and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` in Convex for both development and production. Use a distinct key pair for each deployment and keep it stable after users subscribe. For example:
+
+```bash
+npx convex env set VAPID_PUBLIC_KEY "your-public-key"
+npx convex env set VAPID_PRIVATE_KEY "your-private-key"
+npx convex env set VAPID_SUBJECT "mailto:admin@darvizlabs.online"
+npx convex env set VAPID_PUBLIC_KEY "your-production-public-key" --prod
+npx convex env set VAPID_PRIVATE_KEY "your-production-private-key" --prod
+npx convex env set VAPID_SUBJECT "mailto:admin@darvizlabs.online" --prod
+```
+
+The private key stays in Convex and is never sent to the browser. The Next.js app uses its existing Convex URL and `MAILICO_INTERNAL_SECRET` to expose only the public key. Push is enabled only when all three VAPID values are present. The browser asks for notification permission only after the user turns notifications on; on iOS, Mailico must first be added to the Home Screen. The service worker caches only the generic offline page and does not store signed-in pages, mailbox contents, or API responses.
+
+Mailico serves an installable web manifest, 192px/512px/maskable app icons, and an Apple touch icon. When offline, navigation falls back to a generic page asking the user to reconnect; private inbox data is not available offline.
 
 Convex production needs the auth and server-side secrets:
 

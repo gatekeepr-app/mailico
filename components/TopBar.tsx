@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Menu, Search, Mail, RefreshCw, LogOut } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { PushNotificationsControl, PwaInstallControl } from "@/components/PwaControls";
 
 interface TopBarProps {
   search: string;
@@ -68,6 +69,9 @@ export default function TopBar({
       >
         <RefreshCw className="h-5 w-5" />
       </button>
+
+      {userEmail && <PushNotificationsControl />}
+      <PwaInstallControl />
 
       {isStaff && (
         <Link
