@@ -51,7 +51,7 @@ export default function TopBar({
         </span>
       </button>
 
-      <div className="relative order-last w-full min-w-0 md:order-none md:mx-auto md:flex-1 md:max-w-[56rem]">
+      <div className="relative order-last w-full min-w-0 md:order-none md:mx-auto md:flex-1 md:max-w-[68rem]">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718078]" />
         <input
           type="text"

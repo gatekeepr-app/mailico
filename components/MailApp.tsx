@@ -473,7 +473,8 @@ export default function MailApp() {
         onOpenNav={() => setNavOpen(true)}
         onRefresh={() => {
           setSelectedId(null);
-          toast.success("Refreshed");
+          setSelectedIds(new Set());
+          toast.success("Mailbox is up to date");
         }}
         onGoInbox={() => navigate("inbox")}
         userEmail={userEmail}
@@ -553,16 +554,16 @@ export default function MailApp() {
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1">
-          <div
-            className={`min-h-0 min-w-0 ${selected ? "hidden" : "flex w-full flex-col md:w-[min(360px,42%)] md:border-r md:border-gray-200 xl:w-[min(420px,40%)]"}`}
-          >
+        <main className="flex min-h-0 min-w-0 flex-1">
+          <div className={`min-h-0 min-w-0 ${selected ? "hidden" : "flex w-full flex-col"}`}>
             <EmailList
               emails={filtered}
               threadContextEmails={allEmails}
               folder={folder}
               selectedId={selectedId}
               selectedIds={selectedIds}
+              hasMore={folder !== "drafts" && mailboxEntries.status === "CanLoadMore"}
+              searchMatches={searchMatches}
               onOpen={handleOpen}
               onToggleStar={toggleStar}
               onToggleSelectMany={(ids) =>
@@ -578,6 +579,11 @@ export default function MailApp() {
               }
               onDeleteSelected={handleDeleteSelected}
               onClearSelection={() => setSelectedIds(new Set())}
+              onRefresh={() => {
+                setSelectedIds(new Set());
+                toast.success("Mailbox is up to date");
+              }}
+              onLoadMore={() => mailboxEntries.loadMore(25)}
             />
           </div>
 
@@ -602,32 +608,7 @@ export default function MailApp() {
                 }}
               />
             </div>
-          ) : (
-            <div className="hidden min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-[#fbfcfa] text-[#87948d] md:flex">
-              <EnvelopeSimple size={56} weight="thin" className="text-[#aab7af]" />
-              <p className="text-sm text-[#718078]">
-                {searchMatches
-                  ? "No messages match your search"
-                  : "Select a message to read it"}
-              </p>
-              <button
-                onClick={() => openCompose()}
-                className="mt-2 rounded-full bg-[#286653] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#1f5544] active:scale-[0.98]"
-              >
-                Compose
-              </button>
-            </div>
-          )}
-          {folder !== "drafts" && mailboxEntries.status === "CanLoadMore" && !selected && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              <button
-                onClick={() => mailboxEntries.loadMore(25)}
-                className="rounded-full border border-[#d7e1da] bg-white px-4 py-2 text-sm font-medium text-[#46564e] shadow-sm hover:bg-[#f5f8f5]"
-              >
-                Load more
-              </button>
-            </div>
-          )}
+          ) : null}
         </main>
       </div>
 

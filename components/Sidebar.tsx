@@ -43,7 +43,7 @@ export default function Sidebar({
   canViewDepartmentSent = false,
 }: SidebarProps) {
   return (
-    <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
+    <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64 xl:w-[min(20vw,24rem)]"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
       <div className="flex items-center justify-between p-3 md:px-4">
         <button
           onClick={onCompose}

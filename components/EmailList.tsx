@@ -1,6 +1,19 @@
 "use client";
 
-import { Star, Trash2, FileText, Archive } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Archive,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Inbox,
+  Info,
+  RefreshCw,
+  Tag,
+  Trash2,
+  UsersRound,
+  Star,
+} from "lucide-react";
 import { formatMailboxName, formatTimestamp, groupEmailsIntoThreads, snippet, folderLabel } from "@/lib/mail";
 import type { Email, FolderKey } from "@/lib/types";
 
@@ -10,11 +23,32 @@ interface EmailListProps {
   folder: FolderKey;
   selectedId: string | null;
   selectedIds: Set<string>;
+  hasMore: boolean;
+  searchMatches: boolean;
   onOpen: (email: Email) => void;
   onToggleStar: (id: string) => void;
   onToggleSelectMany: (ids: string[]) => void;
   onDeleteSelected: () => void;
   onClearSelection: () => void;
+  onRefresh: () => void;
+  onLoadMore: () => void;
+}
+
+type Category = "primary" | "promotions" | "social" | "updates";
+
+const CATEGORIES: { id: Category; label: string; icon: typeof Inbox }[] = [
+  { id: "primary", label: "Primary", icon: Inbox },
+  { id: "promotions", label: "Promotions", icon: Tag },
+  { id: "social", label: "Social", icon: UsersRound },
+  { id: "updates", label: "Updates", icon: Info },
+];
+
+function categoryFor(email: Email): Category {
+  const text = `${email.from} ${email.fromName ?? ""} ${email.subject} ${email.body}`.toLowerCase();
+  if (/unsubscribe|newsletter|promotion|discount|coupon|special offer|sale|deal of the day/.test(text)) return "promotions";
+  if (/linkedin|facebook|instagram|twitter|reddit|discord|social|new follower|mentioned you|invited you to connect/.test(text)) return "social";
+  if (/security alert|verification|verify your|receipt|invoice|delivery|shipping|password reset|account update|statement|payment/.test(text)) return "updates";
+  return "primary";
 }
 
 function displayName(email: Email): string {
@@ -30,116 +64,188 @@ export default function EmailList({
   folder,
   selectedId,
   selectedIds,
+  hasMore,
+  searchMatches,
   onOpen,
   onToggleStar,
   onToggleSelectMany,
   onDeleteSelected,
   onClearSelection,
+  onRefresh,
+  onLoadMore,
 }: EmailListProps) {
-  const hasSelection = selectedIds.size > 0;
-  const threads = groupEmailsIntoThreads(emails);
+  const [category, setCategory] = useState<Category>("primary");
+  const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
+  const allThreads = useMemo(() => groupEmailsIntoThreads(emails), [emails]);
+  const threads = useMemo(
+    () => folder === "inbox" && category !== "primary"
+      ? allThreads.filter((thread) => categoryFor(thread.latest) === category)
+      : folder === "inbox"
+        ? allThreads.filter((thread) => categoryFor(thread.latest) === "primary")
+        : allThreads,
+    [allThreads, category, folder],
+  );
   const threadContextByKey = new Map(
     groupEmailsIntoThreads(threadContextEmails).map((thread) => [thread.key, thread] as const),
   );
+  const visibleIds = threads.flatMap((thread) =>
+    (threadContextByKey.get(thread.key)?.messages ?? thread.messages).map((message) => message.id),
+  );
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col">
-      {hasSelection && (
-        <div className="flex items-center gap-2 border-b border-[#e3e9e4] bg-white px-4 py-2">
+    <section className="flex min-h-0 flex-1 flex-col bg-white">
+      <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-[#e3e9e4] px-3 sm:px-5">
+        <label className="flex min-h-11 min-w-11 items-center justify-center" aria-label="Select all conversations">
+          <input
+            aria-label="Select all conversations in the current view"
+            type="checkbox"
+            checked={allVisibleSelected}
+            disabled={visibleIds.length === 0}
+            onChange={() => onToggleSelectMany(visibleIds)}
+            className="h-5 w-5 accent-[#286653]"
+          />
+        </label>
+        <div className="relative">
           <button
-            onClick={onDeleteSelected}
-            className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-[#46564e] hover:bg-[#f0f4f1]"
+            type="button"
+            aria-label="Selection options"
+            aria-expanded={selectionMenuOpen}
+            onClick={() => setSelectionMenuOpen((open) => !open)}
+            className="flex min-h-10 min-w-8 items-center justify-center rounded-full text-[#718078] hover:bg-[#f0f4f1]"
           >
-            <Trash2 className="h-4 w-4" />
-            Delete
+            <ChevronDown className="h-4 w-4" />
           </button>
-          <button
-            onClick={onClearSelection}
-            className="ml-auto rounded-md px-3 py-1.5 text-sm text-[#718078] hover:bg-[#f0f4f1]"
-          >
-            Cancel
-          </button>
-          <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
+          {selectionMenuOpen && (
+            <div role="menu" aria-label="Select conversations" className="absolute left-0 top-11 z-20 w-40 rounded-md border border-[#e3e9e4] bg-white p-1 shadow-lg">
+              <SelectionMenuItem label="All" onClick={() => { onToggleSelectMany(visibleIds); setSelectionMenuOpen(false); }} />
+              <SelectionMenuItem label="None" onClick={() => { onClearSelection(); setSelectionMenuOpen(false); }} />
+              <div className="my-1 border-t border-[#edf1ed]" />
+              {([
+                ["Read", (email: Email) => email.read],
+                ["Unread", (email: Email) => !email.read],
+                ["Starred", (email: Email) => email.starred],
+                ["Unstarred", (email: Email) => !email.starred],
+              ] as const).map(([label, matches]) => {
+                const ids = threads
+                  .filter((thread) => matches(thread.latest))
+                  .flatMap((thread) => (threadContextByKey.get(thread.key) ?? thread).messages.map((message) => message.id));
+                return <SelectionMenuItem key={label} label={label} onClick={() => { onToggleSelectMany(ids); setSelectionMenuOpen(false); }} />;
+              })}
+            </div>
+          )}
         </div>
+        <button onClick={onRefresh} aria-label="Refresh inbox" className="flex min-h-10 min-w-10 items-center justify-center rounded-full text-[#52635b] hover:bg-[#f0f4f1]">
+          <RefreshCw className="h-4 w-4" />
+        </button>
+        {selectedIds.size > 0 && (
+          <>
+            <button onClick={onDeleteSelected} className="flex min-h-10 items-center gap-2 rounded-md px-3 text-sm text-[#46564e] hover:bg-[#f0f4f1]">
+              <Trash2 className="h-4 w-4" /> <span className="hidden sm:inline">Delete</span>
+            </button>
+            <button onClick={onClearSelection} className="rounded-md px-3 py-2 text-sm text-[#718078] hover:bg-[#f0f4f1]">Clear</button>
+          </>
+        )}
+        <div className="ml-auto flex min-w-0 items-center gap-1 text-xs text-[#718078] sm:gap-3 sm:text-sm">
+          <span className="whitespace-nowrap">{emails.length} loaded</span>
+          {hasMore && (
+            <button onClick={onLoadMore} aria-label="Load more messages" title="Load more messages" className="flex min-h-10 min-w-10 items-center justify-center rounded-full hover:bg-[#f0f4f1]">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {folder === "inbox" && (
+        <nav aria-label="Inbox categories" className="grid shrink-0 grid-cols-2 border-b border-[#e3e9e4] sm:grid-cols-4">
+          {CATEGORIES.map(({ id, label, icon: Icon }) => {
+            const active = category === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setCategory(id)}
+                className={`flex min-h-12 items-center gap-2 border-b-2 px-3 text-left text-sm transition-colors sm:min-h-14 sm:px-5 ${
+                  active
+                    ? "border-[#286653] font-semibold text-[#286653]"
+                    : "border-transparent text-[#68766e] hover:bg-[#f7f9f7] hover:text-[#24352e]"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </nav>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {emails.length === 0 ? (
-          <EmptyState folder={folder} />
+        {threads.length === 0 ? (
+          <EmptyState folder={folder} category={category} searchMatches={searchMatches} />
         ) : (
-        <ul className="divide-y divide-[#edf1ed]">
+          <ul className="divide-y divide-[#e8ede9]">
             {threads.map((thread) => {
               const email = thread.latest;
               const contextMessages = threadContextByKey.get(thread.key)?.messages ?? thread.messages;
               const threadIds = contextMessages.map((message) => message.id);
               const active = threadIds.includes(selectedId ?? "");
-              const selectedCount = threadIds.filter((id) => selectedIds.has(id)).length;
-              const allSelected = selectedCount === threadIds.length;
+              const allSelected = threadIds.length > 0 && threadIds.every((id) => selectedIds.has(id));
               const senderNames = [...new Set(thread.messages.map(displayName))];
-              const senderLabel = folder === "sent"
-                ? displayName(email)
-                : senderNames.join(", ");
+              const senderLabel = folder === "sent" ? displayName(email) : senderNames.join(", ");
               const unread = thread.messages.some((message) => !message.read);
               return (
                 <li key={thread.key}>
                   <div
                     onClick={() => onOpen(email)}
-                    className={`grid min-w-0 cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 border-b border-[#edf1ed] px-2 py-2.5 transition-colors hover:bg-[#f5f8f5] sm:px-4 ${
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open conversation: ${email.subject || "no subject"}`}
+                    onKeyDown={(event) => {
+                      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                        event.preventDefault();
+                        onOpen(email);
+                      }
+                    }}
+                    className={`group grid min-h-[3.75rem] min-w-0 cursor-pointer grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-1 border-l-2 px-2 py-2 transition-colors hover:bg-[#f5f8f5] sm:grid-cols-[2rem_2rem_minmax(8rem,15rem)_minmax(0,1fr)_5.5rem] sm:gap-x-3 sm:px-4 ${
                       active
-                        ? "border-l-2 border-l-[#286653] bg-[#e8f1eb]"
-                        : !unread
-                          ? "bg-white"
-                          : "bg-[#f5f8f5]"
+                        ? "border-l-[#286653] bg-[#e8f1eb]"
+                        : `border-l-transparent ${unread ? "bg-[#f7faf7]" : "bg-white"}`
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => onToggleSelectMany(threadIds)}
-                      className="col-start-1 row-span-2 mx-auto h-5 w-5 shrink-0 accent-[#286653]"
-                      aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleStar(email.id);
-                      }}
-                      aria-label={email.starred ? "Unstar" : "Star"}
-                      className="col-start-1 row-start-2 mx-auto flex min-h-11 min-w-11 items-center justify-center"
-                    >
-                      <Star
-                        className={`h-5 w-5 ${
-                          email.starred
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-[#c6d0c9] hover:text-[#718078]"
-                        }`}
+                    <div className="col-start-1 row-span-2 flex items-center justify-start gap-2 sm:contents">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => onToggleSelectMany(threadIds)}
+                        className="h-5 w-5 shrink-0 accent-[#286653] sm:col-start-1 sm:row-start-1"
+                        aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
                       />
-                    </button>
-
-                    <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-2">
-                      <span
-                        className={`min-w-0 flex-1 truncate text-sm ${
-                          unread ? "font-bold text-gray-900" : "text-gray-700"
-                        }`}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleStar(email.id);
+                        }}
+                        aria-label={email.starred ? "Unstar" : "Star"}
+                        className="flex min-h-10 min-w-10 items-center justify-center rounded-full hover:bg-[#edf3ef] sm:col-start-2 sm:row-start-1"
                       >
+                        <Star className={`h-5 w-5 ${email.starred ? "fill-amber-400 text-amber-400" : "text-[#c6d0c9] group-hover:text-[#718078]"}`} />
+                      </button>
+                    </div>
+                    <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:col-start-3 sm:row-start-1">
+                      <span className={`min-w-0 flex-1 truncate text-sm ${unread ? "font-semibold text-[#24352e]" : "text-[#46564e]"}`}>
                         {senderLabel}
                       </span>
-                      {contextMessages.length > 1 && (
-                        <span className="shrink-0 rounded-full bg-[#e9efeb] px-1.5 py-0.5 text-[11px] font-medium text-[#52635b]">
-                          {contextMessages.length}
-                        </span>
-                      )}
-                      <time className="shrink-0 text-[11px] text-[#718078] sm:text-xs">
-                        {formatTimestamp(email.createdAt)}
-                      </time>
+                      {contextMessages.length > 1 && <span className="shrink-0 rounded-full bg-[#e9efeb] px-1.5 py-0.5 text-[11px] font-medium text-[#52635b]">{contextMessages.length}</span>}
+                      <time className="shrink-0 text-[11px] text-[#718078] sm:hidden">{formatTimestamp(email.createdAt)}</time>
                     </div>
-                    <div className="col-start-2 row-start-2 min-w-0 truncate">
-                      <span className={`${!unread ? "text-sm text-[#52635b]" : "text-sm font-semibold text-[#24352e]"}`}>
-                        {email.subject || "(no subject)"}
-                      </span>
-                      {email.subject && <span className="ml-2 text-sm text-[#87948d]">{snippet(email.body, 60)}</span>}
+                    <div className="col-start-2 row-start-2 min-w-0 truncate sm:col-start-4 sm:row-start-1">
+                      <span className={`${unread ? "text-sm font-semibold text-[#24352e]" : "text-sm text-[#52635b]"}`}>{email.subject || "(no subject)"}</span>
+                      {email.subject && <span className="ml-2 text-sm text-[#87948d]">{snippet(email.body, 100)}</span>}
                     </div>
+                    <time className="hidden justify-self-end whitespace-nowrap text-xs text-[#718078] sm:col-start-5 sm:row-start-1 sm:block">{formatTimestamp(email.createdAt)}</time>
                   </div>
                 </li>
               );
@@ -151,15 +257,30 @@ export default function EmailList({
   );
 }
 
-function EmptyState({ folder }: { folder: FolderKey }) {
+function SelectionMenuItem({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-gray-400">
-      {folder === "inbox" ? (
-        <Archive className="h-10 w-10" />
-      ) : (
-        <FileText className="h-10 w-10" />
-      )}
-      <p className="text-sm">{folder === "inbox" ? "No messages here" : `No ${folderLabel(folder).toLowerCase()} messages here`}</p>
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="flex min-h-9 w-full items-center rounded px-3 text-left text-sm text-[#46564e] hover:bg-[#f0f4f1]"
+    >
+      {label}
+    </button>
+  );
+}
+
+function EmptyState({ folder, category, searchMatches }: { folder: FolderKey; category: Category; searchMatches: boolean }) {
+  const Icon = folder === "inbox" ? Inbox : folder === "trash" ? Archive : FileText;
+  const message = searchMatches
+    ? "No messages match your search"
+    : folder === "inbox"
+      ? `No ${category} conversations`
+      : `No ${folderLabel(folder).toLowerCase()} messages here`;
+  return (
+    <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 px-5 text-center text-[#87948d]">
+      <Icon className="h-10 w-10 text-[#aab7af]" strokeWidth={1.5} />
+      <p className="text-sm">{message}</p>
     </div>
   );
 }
