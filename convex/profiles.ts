@@ -711,9 +711,28 @@ export const listDepartments = query({
     ]);
     return departments.map((department) => ({
       ...department,
+      headTitle: department.headTitle?.trim() || "Department head",
       hrLeadName: profiles.find((profile) => profile.departmentId === department._id && profile.role === "hrLead")?.name,
       pendingHrLeadName: invitations.find((invite) => invite.departmentId === department._id && invite.role === "hrLead")?.name,
     }));
+  },
+});
+
+export const updateDepartmentHeadTitle = mutation({
+  args: { departmentId: v.id("departments"), title: v.string() },
+  handler: async (ctx, args) => {
+    const { profile } = await requireStaff(ctx);
+    if (profile?.role !== "admin" && profile?.role !== "chief") {
+      throw new ConvexError("Only the business owner or chief can update department positions.");
+    }
+    const department = await ctx.db.get(args.departmentId);
+    if (!department) throw new ConvexError("Department not found.");
+    const title = args.title.trim().replace(/\s+/g, " ");
+    if (title.length < 2 || title.length > 60) {
+      throw new ConvexError("Position title must be between 2 and 60 characters.");
+    }
+    await ctx.db.patch(department._id, { headTitle: title });
+    return { headTitle: title };
   },
 });
 

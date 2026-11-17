@@ -10,7 +10,7 @@ One company workspace per deployment. Every page is scoped to the authenticated 
 | --- | --- | --- |
 | `/admin` | Live operational overview, pending address requests, employee directory, departments, Resend status, and shortcuts | Admin, Chief, HR Lead, HR |
 | `/admin/employees` | Invite employees, list/cancel pending invitations, assign roles/departments/company addresses, send password reset emails to the employee's verified primary account email | Admin, Chief, HR Lead, HR; invite is owner-only; role changes follow existing role policy |
-| `/admin/departments` | Create departments and inspect each department's HR Lead status | Admin, Chief, HR Lead, HR (mutations remain Convex-authorized) |
+| `/admin/departments` | Create departments, customize each department-head position title, and inspect assignment status | Admin or Chief can change titles; staff can inspect departments |
 | `/admin/requests` | Approve or decline company email address requests | Admin, Chief, HR Lead, HR (mutations remain Convex-authorized) |
 | `/admin/settings` | Check Resend status and correct an unverified company domain | Business owner only |
 
@@ -31,6 +31,7 @@ One company workspace per deployment. Every page is scoped to the authenticated 
 - Convex `AUTH_FROM_EMAIL`: verified sender address for auth/verification/reset mail. If omitted, sender falls back to `auth@<SITE_URL hostname>`.
 - `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL`: point the clone to its own Convex deployment.
 - Company mail domain: set interactively in `/setup`, then stored in Convex company settings; it is not embedded in source.
+- Department-head titles: customized per department in `/admin/departments`; assignment stays in the employee role/department controls. Internally, this remains the controlled `hrLead` capability so title edits never grant mailbox access.
 
 Keep the auth sender domain verified in Resend. Changing a deployment's site origin requires matching `SITE_URL` and any additional `TRUSTED_ORIGINS` in Convex, plus the clone's Vercel hostname.
 

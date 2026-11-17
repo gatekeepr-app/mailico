@@ -12,13 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type EmployeeRole = "user" | "hrLead";
+type InviteDepartment = Doc<"departments"> & { headTitle?: string };
 
 export default function EmployeeInvitePanel({
   domain,
   departments,
 }: {
   domain: string;
-  departments: Doc<"departments">[];
+  departments: InviteDepartment[];
 }) {
   const invitations = useQuery(api.profiles.listEmployeeInvitations);
   const cancelInvitation = useMutation(api.profiles.cancelEmployeeInvitation);
@@ -28,6 +29,7 @@ export default function EmployeeInvitePanel({
   const [departmentId, setDepartmentId] = useState("");
   const [role, setRole] = useState<EmployeeRole>("user");
   const [sending, setSending] = useState(false);
+  const headTitle = departments.find((department) => department._id === departmentId)?.headTitle ?? "Department head";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,7 +82,7 @@ export default function EmployeeInvitePanel({
       </CardHeader>
       <CardContent className="space-y-5">
         {departments.length === 0 ? (
-          <p className="border border-dashed p-4 text-sm text-muted-foreground">Create a department first, then invite its employees and HR Lead.</p>
+          <p className="border border-dashed p-4 text-sm text-muted-foreground">Create a department first, then assign its department-head position and invite employees.</p>
         ) : (
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
@@ -113,10 +115,10 @@ export default function EmployeeInvitePanel({
                 <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="user">Employee</SelectItem>
-                  <SelectItem value="hrLead">Department HR Lead</SelectItem>
+                  <SelectItem value="hrLead">{headTitle}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Each department can have one HR Lead. That person can review all sent mail from their department.</p>
+              <p className="text-xs text-muted-foreground">Each department can have one {headTitle}. This person can review all mail sent by employees assigned to that department.</p>
             </div>
             <Button type="submit" disabled={sending || !departmentId} className="min-h-11 rounded-none bg-[#286653] text-white hover:bg-[#1f5544] sm:col-span-2 sm:justify-self-start">
               {sending ? "Sending invitation…" : "Send employee invitation"}

@@ -26,6 +26,7 @@ export default defineSchema({
   departments: defineTable({
     name: v.string(),
     slug: v.string(),
+    headTitle: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_slug", ["slug"]),
 

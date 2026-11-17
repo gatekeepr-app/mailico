@@ -34,6 +34,10 @@ export default function MailApp() {
   const { data: session } = authClient.useSession();
   const ensureCurrentProfile = useMutation(api.profiles.ensureCurrentProfile);
   const profileData = useQuery(api.profiles.getMyProfile);
+  const configuredHeadTitle = profileData?.department?.headTitle?.trim();
+  const departmentSentLabel = configuredHeadTitle && configuredHeadTitle.toLowerCase() !== "department head"
+    ? `${configuredHeadTitle} sent`
+    : "Department sent";
   const drafts = useQuery(api.mail.listDrafts);
   const emailAddressRequest = useQuery(api.profiles.getMyEmailAddressRequest);
   const upsertDraft = useMutation(api.mail.upsertDraft);
@@ -550,6 +554,7 @@ export default function MailApp() {
             onClose={() => setNavOpen(false)}
             mailDomain={profileData?.companySettings?.domain ?? ""}
             canViewDepartmentSent={profileData?.profile?.role === "hrLead" && Boolean(profileData.profile.departmentId)}
+            departmentSentLabel={departmentSentLabel}
           />
         </div>
 
@@ -566,6 +571,7 @@ export default function MailApp() {
               onClose={() => setNavOpen(false)}
               mailDomain={profileData?.companySettings?.domain ?? ""}
               canViewDepartmentSent={profileData?.profile?.role === "hrLead" && Boolean(profileData.profile.departmentId)}
+              departmentSentLabel={departmentSentLabel}
               mobileDrawer
             />
             <button aria-label="Close navigation" className="min-w-0 flex-1 bg-black/40" onClick={() => setNavOpen(false)} />

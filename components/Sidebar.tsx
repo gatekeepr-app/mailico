@@ -22,6 +22,7 @@ interface SidebarProps {
   mailDomain: string;
   mobileDrawer?: boolean;
   canViewDepartmentSent?: boolean;
+  departmentSentLabel?: string;
 }
 
 const NAV_ITEMS: { key: FolderKey; icon: typeof Inbox }[] = [
@@ -41,6 +42,7 @@ export default function Sidebar({
   mailDomain,
   mobileDrawer = false,
   canViewDepartmentSent = false,
+  departmentSentLabel = "Department sent",
 }: SidebarProps) {
   return (
     <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64 xl:w-[min(20vw,24rem)]"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
@@ -72,10 +74,12 @@ export default function Sidebar({
         {[...NAV_ITEMS, ...(canViewDepartmentSent ? [{ key: "department_sent" as const, icon: Building2 }] : [])].map(({ key, icon: Icon }) => {
           const active = key === current;
           const count = counts[key];
+          const label = key === "department_sent" ? departmentSentLabel : folderLabel(key);
           return (
             <button
               key={key}
               onClick={() => onNavigate(key)}
+              title={label}
               className={`flex min-h-11 w-full items-center gap-4 rounded-r-full px-4 py-2.5 text-sm font-medium transition ${
                 active
                   ? "bg-[#e4efe8] text-[#245b49]"
@@ -83,8 +87,8 @@ export default function Sidebar({
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              <span className={`${mobileDrawer ? "block" : "hidden md:block"} flex-1 text-left`}>
-                {folderLabel(key)}
+              <span className={`${mobileDrawer ? "block" : "hidden md:block"} min-w-0 flex-1 truncate text-left`}>
+                {label}
               </span>
               {typeof count === "number" && count > 0 && (
                 <span

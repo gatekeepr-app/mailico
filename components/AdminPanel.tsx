@@ -35,13 +35,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import EmployeeInvitePanel from "@/components/EmployeeInvitePanel";
 import { authClient } from "@/lib/auth-client";
 
 export type AdminSection = "overview" | "employees" | "departments" | "requests" | "settings";
 
 type ProfileRole = "admin" | "chief" | "hrLead" | "hr" | "user";
+type DepartmentSummary = Doc<"departments"> & {
+  headTitle?: string;
+  hrLeadName?: string;
+  pendingHrLeadName?: string;
+};
 type ProfileWithDepartment = Doc<"userProfiles"> & {
   department: Doc<"departments"> | null;
 };
@@ -244,11 +249,12 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
                           <p className="font-medium">{department.name}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {department.hrLeadName
-                              ? `HR Lead: ${department.hrLeadName}`
+                              ? `${department.headTitle ?? "Department head"}: ${department.hrLeadName}`
                               : department.pendingHrLeadName
-                                ? `HR Lead invitation pending: ${department.pendingHrLeadName}`
-                                : "No HR Lead assigned"}
+                                ? `${department.headTitle ?? "Department head"} invitation pending: ${department.pendingHrLeadName}`
+                                : `No ${department.headTitle ?? "department head"} assigned`}
                           </p>
+                          {userCanChangeRoles && <DepartmentPositionEditor departmentId={department._id} initialTitle={department.headTitle ?? "Department head"} />}
                         </li>
                       ))}
                     </ul>
@@ -410,7 +416,7 @@ function EmployeeRow({
   onUpdate,
 }: {
   profile: ProfileWithDepartment;
-  departments: Doc<"departments">[];
+  departments: DepartmentSummary[];
   domain: string;
   userCanChangeRoles: boolean;
   onUpdate: (event: FormEvent<HTMLFormElement>) => void;
@@ -424,6 +430,7 @@ function EmployeeRow({
   const initialRole = profile.role;
   const initialDepartmentId = profile.departmentId ?? "none";
   const initialAssignedEmail = profile.assignedEmail?.split("@")[0] ?? "";
+  const departmentHeadTitle = departments.find((department) => department._id === departmentId)?.headTitle ?? "Department head";
   const [resetting, setResetting] = useState(false);
   const hasChanges =
     role !== initialRole ||
@@ -477,7 +484,7 @@ function EmployeeRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="user">User</SelectItem>
-            <SelectItem value="hrLead">HR Lead</SelectItem>
+            <SelectItem value="hrLead">{departmentHeadTitle}</SelectItem>
             <SelectItem value="chief">Chief</SelectItem>
             {profile.role === "hr" && <SelectItem value="hr">HR</SelectItem>}
             {profile.role === "admin" && <SelectItem value="admin">Admin</SelectItem>}
@@ -523,6 +530,34 @@ function EmployeeRow({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+function DepartmentPositionEditor({ departmentId, initialTitle }: { departmentId: Id<"departments">; initialTitle: string }) {
+  const updateTitle = useMutation(api.profiles.updateDepartmentHeadTitle);
+  const [title, setTitle] = useState(initialTitle);
+  const [saving, setSaving] = useState(false);
+  const unchanged = title.trim().replace(/\s+/g, " ") === initialTitle;
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const result = await updateTitle({ departmentId, title });
+      setTitle(result.headTitle);
+      toast.success("Department position updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update position title");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="mt-2 flex items-center gap-2">
+      <Input aria-label="Department head position title" value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} className="h-9 min-w-0" />
+      <Button type="submit" size="sm" variant="outline" disabled={saving || unchanged}>{saving ? "Saving…" : "Save title"}</Button>
+    </form>
   );
 }
 
