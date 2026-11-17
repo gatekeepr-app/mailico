@@ -85,7 +85,6 @@ export async function POST(request: Request) {
 
   const invitationUrl = new URL(`/invite/${token}`, request.url).toString();
   const safeName = escapeHtml(name);
-  const safeEmail = escapeHtml(accountEmail);
   const safeAssignedEmail = escapeHtml(data.assignedLocalPart.trim().toLowerCase() + "@" + profileData.companySettings.domain);
   const safeUrl = escapeHtml(invitationUrl);
   const resend = new Resend(apiKey);
@@ -95,8 +94,8 @@ export async function POST(request: Request) {
       from: `Mailico <auth@${profileData.companySettings.domain}>`,
       to: [accountEmail],
       subject: "You’re invited to your company Mailico account",
-      html: `<p>Hi ${safeName},</p><p>Your administrator invited you to use <strong>${safeAssignedEmail}</strong> for company email.</p><p>Open the invitation to create your password. Mailico will then send a verification email to <strong>${safeEmail}</strong>.</p><p>Your department HR Lead can review messages sent from department accounts.</p><p><a href="${safeUrl}">Accept invitation</a></p><p>This invitation expires in seven days. If you were not expecting it, you can ignore this email.</p>`,
-      text: `Hi ${name},\n\nYour administrator invited you to use ${data.assignedLocalPart.trim().toLowerCase()}@${profileData.companySettings.domain} for company email. Open this link to create your password; Mailico will then send a verification email to ${accountEmail}. Your department HR Lead can review messages sent from department accounts.\n\n${invitationUrl}\n\nThis invitation expires in seven days. If you were not expecting it, you can ignore this email.`,
+      html: `<p>Hi ${safeName},</p><p>Your administrator invited you to use <strong>${safeAssignedEmail}</strong> for company email.</p><p>Open the invitation to choose your personal or primary email, create a password, and verify that email. It will be used for account recovery.</p><p>Your department HR Lead can review messages sent from department accounts.</p><p><a href="${safeUrl}">Accept invitation</a></p><p>This invitation expires in seven days. If you were not expecting it, you can ignore this email.</p>`,
+      text: `Hi ${name},\n\nYour administrator invited you to use ${data.assignedLocalPart.trim().toLowerCase()}@${profileData.companySettings.domain} for company email. Open this link to choose your personal or primary email, create a password, and verify that email. It will be used for account recovery. Your department HR Lead can review messages sent from department accounts.\n\n${invitationUrl}\n\nThis invitation expires in seven days. If you were not expecting it, you can ignore this email.`,
     });
     sendError = result.error;
   } catch (error) {

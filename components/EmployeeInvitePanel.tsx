@@ -75,7 +75,7 @@ export default function EmployeeInvitePanel({
       <CardHeader>
         <CardTitle>Invite an employee</CardTitle>
         <CardDescription>
-          Send an invitation to the employee’s real email. They’ll set a password, verify that email, and receive the company address below.
+          Send an invitation to a reachable email address. During onboarding, the employee confirms their personal or primary email; that verified account email receives future password reset links.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -88,7 +88,7 @@ export default function EmployeeInvitePanel({
               <Input id="invite-employee-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-account-email">Real email address</Label>
+              <Label htmlFor="invite-account-email">Invitation delivery email</Label>
               <Input id="invite-account-email" type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} autoComplete="email" required />
             </div>
             <div className="grid gap-2">

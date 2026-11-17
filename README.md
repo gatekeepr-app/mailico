@@ -30,6 +30,8 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
 
    ```bash
    npx convex env set SITE_URL http://localhost:3000
+   npx convex env set APP_NAME "Mailico"
+   npx convex env set AUTH_FROM_EMAIL "auth@your-verified-sender-domain.example"
    npx convex env set BETTER_AUTH_SECRET "your-32-byte-or-longer-secret"
    # After creating the Resend key:
    npx convex env set RESEND_API_KEY "re_xxxxxxxx"
@@ -60,6 +62,7 @@ Vercel needs the public Convex URLs:
 ```env
 NEXT_PUBLIC_CONVEX_URL=...
 NEXT_PUBLIC_CONVEX_SITE_URL=...
+NEXT_PUBLIC_APP_NAME=Your product name
 RESEND_API_KEY=...
 RESEND_WEBHOOK_SECRET=...
 MAILICO_INTERNAL_SECRET=...
@@ -84,16 +87,18 @@ Mailico serves an installable web manifest, 192px/512px/maskable app icons, and 
 Convex production needs the auth and server-side secrets:
 
 ```bash
-npx convex env set SITE_URL https://mailico.darvizlabs.online --prod
+npx convex env set SITE_URL https://your-production-domain.example --prod
+npx convex env set APP_NAME "Your product name" --prod
+npx convex env set AUTH_FROM_EMAIL "auth@your-verified-sender-domain.example" --prod
 npx convex env set BETTER_AUTH_SECRET "your-production-secret" --prod
 npx convex env set RESEND_API_KEY "re_xxxxxxxx" --prod
 npx convex env set MAILICO_INTERNAL_SECRET "same-long-random-secret" --prod
 ```
 
-Set `MAILICO_INTERNAL_SECRET` in both Vercel and Convex, and set `RESEND_WEBHOOK_SECRET` in Vercel. Configure the Resend webhook signing secret in Vercel and point the webhook at `https://mailico.darvizlabs.online/api/receive`.
+Set `MAILICO_INTERNAL_SECRET` in both Vercel and Convex, and set `RESEND_WEBHOOK_SECRET` in Vercel. Configure the Resend webhook signing secret in Vercel and point the webhook at `https://your-production-domain.example/api/receive`.
 Set `MAILICO_OWNER_SETUP_TOKEN` only in the Next.js server environment before first-run setup. Use a separate high-entropy value and remove it after the owner has completed setup.
 
-Better Auth account recovery messages use the Mailico service sender `auth@mail.darvizlabs.online`; that service domain must remain verified in the Resend account used by Convex. Company messages use the separate domain selected in `/setup`.
+Set Convex `APP_NAME` and `AUTH_FROM_EMAIL` for the deployment. `AUTH_FROM_EMAIL` must belong to a verified Resend sending domain; if omitted, the app derives `auth@<SITE_URL hostname>`. Set `SITE_URL` to the clone's canonical URL and `TRUSTED_ORIGINS` to any additional approved origins (comma-separated). The company mail domain is selected during `/setup` and stored in Convex, so it does not need a source change.
 
 If `BETTER_AUTH_SECRET` changes after Better Auth has generated JWKS signing keys, clear the stale `jwks` rows in the Better Auth Convex component or restore the original secret. Otherwise `/api/auth/convex/token` can fail with `Failed to decrypt private key`.
 

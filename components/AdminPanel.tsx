@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
@@ -36,13 +37,16 @@ import {
 } from "@/components/ui/card";
 import type { Doc } from "@/convex/_generated/dataModel";
 import EmployeeInvitePanel from "@/components/EmployeeInvitePanel";
+import { authClient } from "@/lib/auth-client";
+
+export type AdminSection = "overview" | "employees" | "departments" | "requests" | "settings";
 
 type ProfileRole = "admin" | "chief" | "hrLead" | "hr" | "user";
 type ProfileWithDepartment = Doc<"userProfiles"> & {
   department: Doc<"departments"> | null;
 };
 
-export default function AdminPanel() {
+export default function AdminPanel({ section = "overview" }: { section?: AdminSection }) {
   const me = useQuery(api.profiles.getMyProfile);
   const ensureCurrentProfile = useMutation(api.profiles.ensureCurrentProfile);
   const hasAdminPageAccess = canAccessAdminPage(me?.user?.email, me?.profile?.role);
@@ -65,7 +69,7 @@ export default function AdminPanel() {
   const reviewEmailRequest = useMutation(api.profiles.reviewEmailAddressRequest);
   const correctCompanyDomain = useMutation(api.profiles.correctUnverifiedCompanyDomain);
   const [departmentName, setDepartmentName] = useState("");
-  const [domainDraft, setDomainDraft] = useState("");
+  const [domainDraft, setDomainDraft] = useState<string | null>(null);
   const [savingDomain, setSavingDomain] = useState(false);
   const [checkingResend, setCheckingResend] = useState(false);
   const [resendCheckError, setResendCheckError] = useState<string | null>(null);
@@ -75,11 +79,7 @@ export default function AdminPanel() {
     void ensureCurrentProfile();
   }, [ensureCurrentProfile, me?.user]);
 
-  useEffect(() => {
-    if (me?.companySettings?.domain) setDomainDraft(me.companySettings.domain);
-  }, [me?.companySettings?.domain]);
-
-  if (me === undefined) {
+  if (me == null) {
     return <main className="p-8 text-sm text-muted-foreground">Loading…</main>;
   }
 
@@ -159,8 +159,9 @@ export default function AdminPanel() {
     event.preventDefault();
     setSavingDomain(true);
     try {
-      const result = await correctCompanyDomain({ domain: domainDraft });
+      const result = await correctCompanyDomain({ domain: domainDraft ?? me?.companySettings?.domain ?? "" });
       toast.success(result.changed ? `Company domain changed to ${result.domain}` : "Company domain is unchanged");
+      setDomainDraft(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not change company domain");
     } finally {
@@ -168,17 +169,39 @@ export default function AdminPanel() {
     }
   }
 
+  if (section === "overview") {
+    const pendingRequests = emailRequests?.length ?? 0;
+    const employeeCount = profiles.results?.length ?? 0;
+    return (
+      <main className="space-y-6">
+        <header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#557066]">Workspace overview</p><h1 className="mt-2 text-3xl font-medium tracking-[-0.04em] text-[#20332b]">Good to see you, {me.profile?.name?.split(" ")[0] ?? "admin"}</h1><p className="mt-2 text-sm text-muted-foreground">Manage access and email for <strong>{me.companySettings?.domain}</strong>.</p></header>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <OverviewCard label="Address requests" value={emailRequests === undefined ? "…" : String(pendingRequests)} detail="Waiting for review" href="/admin/requests" />
+          <OverviewCard label="Employees" value={profiles.results === undefined ? "…" : String(employeeCount)} detail={profiles.status === "CanLoadMore" ? "First page loaded" : "Active directory"} href="/admin/employees" />
+          <OverviewCard label="Departments" value={departments === undefined ? "…" : String(departments.length)} detail="Team organization" href="/admin/departments" />
+          <OverviewCard label="Mail sending" value={me.companySettings?.resendStatus.replaceAll("_", " ") ?? "Unknown"} detail={me.companySettings?.domain ?? "Company domain"} href="/admin/settings" />
+        </div>
+        <Card className="rounded-none border-[#d9ddd6] shadow-none"><CardHeader><CardTitle>Admin shortcuts</CardTitle><CardDescription>Common workspace tasks</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3"><Shortcut href="/admin/employees" title="Invite an employee" text="Add a team member and assign a company address."/><Shortcut href="/admin/requests" title="Review address requests" text="Approve or decline requested sender addresses."/><Shortcut href="/admin/departments" title="Manage departments" text="Organize employees and department HR Leads."/></CardContent></Card>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-[100dvh] bg-[#f5f5f0] px-4 py-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="border-b border-[#d9ddd6] pb-5">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#557066]">Workspace administration</p>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#557066]">{section === "employees" ? "Team administration" : section === "departments" ? "Team structure" : section === "requests" ? "Access management" : "Workspace settings"}</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-          <h1 className="text-3xl font-medium tracking-[-0.04em] text-[#20332b]">People & access</h1>
+          <h1 className="text-3xl font-medium tracking-[-0.04em] text-[#20332b]">{section === "employees" ? "Employees" : section === "departments" ? "Departments" : section === "requests" ? "Address requests" : "Mail settings"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Assign departments, roles, and company email addresses. Sender
-            addresses use <code>@{me?.companySettings?.domain ?? "your company domain"}</code>.
+            {section === "employees"
+              ? <>Assign roles, departments, and company email addresses using <code>@{me?.companySettings?.domain ?? "your company domain"}</code>.</>
+              : section === "departments"
+                ? "Create departments and track each department’s HR Lead."
+                : section === "requests"
+                  ? "Review employees’ requests for approved company email addresses."
+                  : <>Resend status and sender domain for <code>{me?.companySettings?.domain ?? "your company domain"}</code>.</>}
           </p>
           </div>
           <div className="border border-[#d9ddd6] bg-white px-4 py-2 text-sm text-[#52635b]">
@@ -187,8 +210,8 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
-          <Card className="rounded-none border-[#d9ddd6] bg-[#fbfbf8] shadow-none lg:sticky lg:top-6">
+        <div className="grid gap-6">
+          {section === "departments" && <Card className="rounded-none border-[#d9ddd6] bg-[#fbfbf8] shadow-none lg:sticky lg:top-6">
             <CardHeader>
               <CardTitle>Departments</CardTitle>
               <CardDescription>Create and review department records.</CardDescription>
@@ -233,13 +256,13 @@ export default function AdminPanel() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
           <div className="space-y-6">
-          {me?.companySettings?.isOwner && (
+          {section === "employees" && me?.companySettings?.isOwner && (
             <EmployeeInvitePanel domain={me.companySettings.domain} departments={departments ?? []} />
           )}
-          {me?.companySettings?.isOwner && (
+          {section === "settings" && me?.companySettings?.isOwner && (
             <Card>
               <CardHeader>
                 <CardTitle>Resend connection</CardTitle>
@@ -256,7 +279,7 @@ export default function AdminPanel() {
               </CardContent>
             </Card>
           )}
-          {me?.companySettings?.isOwner && (
+          {section === "settings" && me?.companySettings?.isOwner && (
             <Card>
               <CardHeader>
                 <CardTitle>Correct an unverified domain</CardTitle>
@@ -273,7 +296,7 @@ export default function AdminPanel() {
                       <Label htmlFor="correct-company-domain">Company mail domain</Label>
                       <Input
                         id="correct-company-domain"
-                        value={domainDraft}
+                        value={domainDraft ?? me.companySettings.domain}
                         onChange={(event) => setDomainDraft(event.target.value)}
                         placeholder="mail.example.com"
                         autoComplete="off"
@@ -281,7 +304,7 @@ export default function AdminPanel() {
                         required
                       />
                     </div>
-                    <Button type="submit" variant="outline" disabled={savingDomain || domainDraft.trim().toLowerCase() === me.companySettings.domain}>
+                    <Button type="submit" variant="outline" disabled={savingDomain || (domainDraft ?? me.companySettings.domain).trim().toLowerCase() === me.companySettings.domain}>
                       {savingDomain ? "Saving…" : "Correct domain"}
                     </Button>
                   </form>
@@ -289,7 +312,7 @@ export default function AdminPanel() {
               </CardContent>
             </Card>
           )}
-          <Card className="rounded-none border-[#d9ddd6] shadow-none">
+          {section === "requests" && <Card className="rounded-none border-[#d9ddd6] shadow-none">
             <CardHeader className="border-b border-[#e5e8e1]">
               <div className="flex items-start justify-between gap-4">
               <div>
@@ -324,9 +347,9 @@ export default function AdminPanel() {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </Card>}
 
-          <Card>
+          {section === "employees" && <Card>
             <CardHeader>
               <CardTitle>Employees</CardTitle>
               <CardDescription>
@@ -371,7 +394,7 @@ export default function AdminPanel() {
                 </Button>
               )}
             </CardContent>
-          </Card>
+          </Card>}
           </div>
         </div>
       </div>
@@ -401,10 +424,27 @@ function EmployeeRow({
   const initialRole = profile.role;
   const initialDepartmentId = profile.departmentId ?? "none";
   const initialAssignedEmail = profile.assignedEmail?.split("@")[0] ?? "";
+  const [resetting, setResetting] = useState(false);
   const hasChanges =
     role !== initialRole ||
     departmentId !== initialDepartmentId ||
     assignedEmail.trim() !== initialAssignedEmail;
+
+  async function sendReset() {
+    setResetting(true);
+    try {
+      const { error } = await authClient.requestPasswordReset({
+        email: profile.accountEmail,
+        redirectTo: "/login",
+      });
+      if (error) throw new Error(error.message ?? "Could not request a password reset.");
+      toast.success("If the account exists, a password reset email has been sent.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not request a password reset.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   return (
     <TableRow>
@@ -475,10 +515,21 @@ function EmployeeRow({
         </div>
       </TableCell>
       <TableCell className="text-right">
-        <Button type="submit" form={`employee-${profile._id}`} disabled={!hasChanges}>
-          Save
-        </Button>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={resetting} onClick={() => void sendReset()}>
+            {resetting ? "Sending…" : "Reset password"}
+          </Button>
+          <Button type="submit" form={`employee-${profile._id}`} disabled={!hasChanges}>Save</Button>
+        </div>
       </TableCell>
     </TableRow>
   );
+}
+
+function OverviewCard({ label, value, detail, href }: { label: string; value: string; detail: string; href: string }) {
+  return <Link href={href} className="group border border-[#d9ddd6] bg-white p-5 transition-colors hover:border-[#286653]"><p className="text-xs font-medium uppercase tracking-wide text-[#718078]">{label}</p><p className="mt-3 text-2xl font-semibold capitalize text-[#20332b]">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></Link>;
+}
+
+function Shortcut({ href, title, text }: { href: string; title: string; text: string }) {
+  return <Link href={href} className="border border-[#e0e4dd] bg-[#fbfbf8] p-4 hover:border-[#286653]"><p className="text-sm font-semibold text-[#20332b]">{title}</p><p className="mt-1 text-sm text-muted-foreground">{text}</p></Link>;
 }

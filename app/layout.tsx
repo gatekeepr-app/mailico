@@ -16,14 +16,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Mailico";
+
 export const metadata: Metadata = {
-  title: "Mailico",
-  description: "Set up and manage your organization's company mail",
-  applicationName: "Mailico",
+  title: appName,
+  description: `Set up and manage your organization's company mail with ${appName}`,
+  applicationName: appName,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Mailico",
+    title: appName,
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },

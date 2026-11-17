@@ -190,6 +190,39 @@ export const getEmployeeInvitation = query({
   },
 });
 
+export const setEmployeeInvitationPrimaryEmail = mutation({
+  args: { tokenHash: v.string(), accountEmail: v.string() },
+  handler: async (ctx, args) => {
+    if (!/^[a-f0-9]{64}$/.test(args.tokenHash)) throw new ConvexError("Invalid invitation link.");
+    const email = args.accountEmail.trim().toLowerCase();
+    if (email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new ConvexError("Enter a valid personal or primary email address.");
+    }
+    const invitation = await ctx.db.query("employeeInvitations")
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", args.tokenHash))
+      .unique();
+    if (!invitation || invitation.status !== "pending" || invitation.expiresAt <= Date.now()) {
+      throw new ConvexError("This invitation is invalid or expired. Ask your administrator for a new invitation.");
+    }
+    const existingProfile = await ctx.db.query("userProfiles")
+      .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", email))
+      .unique();
+    if (existingProfile) throw new ConvexError("This email already has a Mailico account. Sign in to accept the invitation.");
+    const existingInvitation = await ctx.db.query("employeeInvitations")
+      .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", email).eq("status", "pending"))
+      .first();
+    if (existingInvitation && existingInvitation._id !== invitation._id && existingInvitation.expiresAt > Date.now()) {
+      throw new ConvexError("This email already has a pending employee invitation.");
+    }
+    await ctx.db.patch(invitation._id, {
+      accountEmail: email,
+      accountEmailNormalized: email,
+      updatedAt: Date.now(),
+    });
+    return { accountEmail: email };
+  },
+});
+
 export const listEmployeeInvitations = query({
   args: {},
   handler: async (ctx) => {

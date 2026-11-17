@@ -54,7 +54,8 @@ const STATUS_COPY: Record<ResendStatus, { title: string; detail: string }> = {
 };
 
 export default function SetupWizard({ accountEmail }: { accountEmail: string }) {
-  const [domain, setDomain] = useState("mail.darvizlabs.online");
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Mailico";
+  const [domain, setDomain] = useState("");
   const [ownerLocalPart, setOwnerLocalPart] = useState("admin");
   const [bootstrapToken, setBootstrapToken] = useState("");
   const [saving, setSaving] = useState(false);
@@ -114,7 +115,7 @@ export default function SetupWizard({ accountEmail }: { accountEmail: string }) 
               <EnvelopeSimple size={19} weight="regular" />
             </span>
             <div>
-              <p className="text-sm font-semibold tracking-wide">Mailico</p>
+              <p className="text-sm font-semibold tracking-wide">{appName}</p>
               <p className="text-xs text-white/60">Business setup</p>
             </div>
           </div>
@@ -232,7 +233,7 @@ export default function SetupWizard({ accountEmail }: { accountEmail: string }) 
                 <p className="text-sm font-medium text-[#347563]">Company address saved</p>
                 <h2 className="mt-2 text-3xl font-medium tracking-[-0.04em] sm:text-4xl">Connect Resend</h2>
                 <p className="mt-3 max-w-[58ch] text-sm leading-6 text-[#68746e]">
-                  Is the Resend API key set up in your server environments? Mailico checks the key and looks up the configured domain. The key stays on the server.
+                  Is the Resend API key set up in your server environments? {appName} checks the key and looks up the configured domain. The key stays on the server.
                 </p>
               </div>
 

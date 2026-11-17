@@ -8,20 +8,35 @@ import type { DataModel } from "./_generated/dataModel";
 import type { GenericActionCtx } from "convex/server";
 import authConfig from "./auth.config";
 
-const MAIL_DOMAIN = "mail.darvizlabs.online";
-const LIVE_SITE_URL = "https://mailico.darvizlabs.online";
-const LOCAL_SITE_URLS = ["http://localhost:3000", "http://127.0.0.1:3000"];
+function getAppName() {
+  return process.env.APP_NAME?.trim() || "Mailico";
+}
+
+function getAuthFrom() {
+  const configured = process.env.AUTH_FROM_EMAIL?.trim();
+  if (configured) return configured;
+  const siteUrl = process.env.SITE_URL;
+  if (!siteUrl) throw new Error("Set AUTH_FROM_EMAIL or SITE_URL in Convex env.");
+  return `auth@${new URL(siteUrl).hostname}`;
+}
 
 function getTrustedOrigins() {
+  const configuredOrigins = [
+    process.env.SITE_URL,
+    ...(process.env.TRUSTED_ORIGINS ?? "").split(","),
+  ];
+  const normalizedOrigins = configuredOrigins.flatMap((value) => {
+    if (!value?.trim()) return [];
+    try {
+      return [new URL(value.trim()).origin];
+    } catch {
+      return [];
+    }
+  });
   return Array.from(
     new Set(
       [
-        process.env.SITE_URL,
-        LIVE_SITE_URL,
-        ...LOCAL_SITE_URLS,
-        ...(process.env.TRUSTED_ORIGINS ?? "")
-          .split(",")
-          .map((origin) => origin.trim()),
+        ...normalizedOrigins,
       ].filter((origin): origin is string => Boolean(origin)),
     ),
   );
@@ -65,11 +80,11 @@ async function sendResetPasswordEmail({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `Mailico <auth@${MAIL_DOMAIN}>`,
+      from: `${getAppName()} <${getAuthFrom()}>`,
       to: [user.email],
-      subject: "Reset your Mailico password",
-      html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Use this link to reset your Mailico password:</p><p><a href="${escapeHtml(url)}">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>`,
-      text: `Use this link to reset your Mailico password: ${url}`,
+      subject: `Reset your ${getAppName()} password`,
+      html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Use this link to reset your ${escapeHtml(getAppName())} password:</p><p><a href="${escapeHtml(url)}">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>`,
+      text: `Use this link to reset your ${getAppName()} password: ${url}`,
     }),
   });
 
@@ -96,11 +111,11 @@ async function sendVerificationEmail({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `Mailico <auth@${MAIL_DOMAIN}>`,
+      from: `${getAppName()} <${getAuthFrom()}>`,
       to: [user.email],
-      subject: "Verify your Mailico email address",
+      subject: `Verify your ${getAppName()} email address`,
       html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Verify your email address if prompted while signing in:</p><p><a href="${safeUrl}">Verify email address</a></p><p>If you did not create this account, you can ignore this email.</p>`,
-      text: `Verify your Mailico email address: ${url}`,
+      text: `Verify your ${getAppName()} email address: ${url}`,
     }),
   });
   if (!res.ok) throw new Error(`Resend verification email failed (${res.status}).`);
@@ -111,7 +126,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth);
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   const actionCtx = ctx as GenericActionCtx<DataModel>;
   return betterAuth({
-    appName: "Mailico",
+    appName: getAppName(),
     baseURL: process.env.SITE_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: getTrustedOrigins(),
@@ -136,7 +151,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
             });
             if (!allowed) {
               throw new APIError("FORBIDDEN", {
-                message: "Mailico accounts are created through employee invitations.",
+                message: `${getAppName()} accounts are created through employee invitations.`,
               });
             }
           },

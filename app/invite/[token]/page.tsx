@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { EnvelopeSimple } from "@phosphor-icons/react";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -23,11 +23,14 @@ export default function EmployeeInvitationPage() {
   const [tokenHash, setTokenHash] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [primaryEmail, setPrimaryEmail] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const invitation = useQuery(api.profiles.getEmployeeInvitation, tokenHash ? { tokenHash } : "skip");
+  const setInvitationPrimaryEmail = useMutation(api.profiles.setEmployeeInvitationPrimaryEmail);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +46,11 @@ export default function EmployeeInvitationPage() {
     event.preventDefault();
     setError(null);
     if (!invitation) return;
+    const email = primaryEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Enter a valid personal or primary email address.");
+      return;
+    }
     if (password.length < 8) {
       setError("Use a password with at least 8 characters.");
       return;
@@ -53,9 +61,10 @@ export default function EmployeeInvitationPage() {
     }
     setCreating(true);
     try {
+      await setInvitationPrimaryEmail({ tokenHash, accountEmail: email });
       const { error: signUpError } = await authClient.signUp.email({
         name: invitation.name,
-        email: invitation.accountEmail,
+        email,
         password,
         callbackURL: "/mail",
       });
@@ -67,6 +76,7 @@ export default function EmployeeInvitationPage() {
         throw new Error(signUpError.message ?? "Could not create your account.");
       }
       setVerificationSent(true);
+      setVerificationEmail(email);
       setPassword("");
       setConfirmPassword("");
     } catch (cause) {
@@ -91,10 +101,10 @@ export default function EmployeeInvitationPage() {
           </CardTitle>
           <CardDescription>
             {existingAccount
-              ? `An account already exists for ${invitation?.accountEmail}. Sign in with that account to accept the company invitation.`
+              ? `An account already exists for ${primaryEmail || invitation?.accountEmail}. Sign in with that account to accept the company invitation.`
               : verificationSent
-              ? `We sent a verification link to ${invitation?.accountEmail}. Verify that address before signing in.`
-              : "Accept your administrator’s invitation, create a password, and verify your real email address. Your department HR Lead can review messages sent from department accounts."}
+              ? `We sent a verification link to ${verificationEmail}. Verify that address before signing in.`
+              : "Accept your administrator’s invitation, choose your personal or primary email for account recovery, create a password, and verify that address. Your department HR Lead can review messages sent from department accounts."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,18 +130,23 @@ export default function EmployeeInvitationPage() {
               <p><span className="font-medium">Department:</span> {invitation.department}</p>
               <p className="text-muted-foreground">The verification link expires according to the email instructions. After verification, your account can sign in to Mailico.</p>
               <Button asChild variant="outline" className="min-h-11 w-full rounded-none">
-                <Link href={`/verify-email?email=${encodeURIComponent(invitation.accountEmail)}`}>Resend verification email</Link>
+                <Link href={`/verify-email?email=${encodeURIComponent(verificationEmail || invitation.accountEmail)}`}>Resend verification email</Link>
               </Button>
             </div>
           ) : (
             <div className="space-y-5">
               <div className="border border-[#d9ddd6] bg-[#fbfbf8] p-4 text-sm">
                 <p className="font-medium">{invitation.name}</p>
-                <p className="break-all text-muted-foreground">{invitation.accountEmail}</p>
+                <p className="break-all text-muted-foreground">Invitation sent to: {invitation.accountEmail}</p>
                 <p className="mt-2 font-medium text-[#286653]">{invitation.assignedEmail}</p>
                 <p className="text-xs text-muted-foreground">{invitation.department} · {invitation.role === "hrLead" ? "Department HR Lead" : "Employee"}</p>
               </div>
               <form onSubmit={accept} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee-primary-email">Personal or primary email</Label>
+                  <Input id="employee-primary-email" type="email" value={primaryEmail} onChange={(event) => setPrimaryEmail(event.target.value)} placeholder={invitation.accountEmail} autoComplete="email" required />
+                  <p className="text-xs text-muted-foreground">We’ll verify this address and use it for password reset emails. It can be different from the invitation delivery address.</p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="employee-new-password">Create password</Label>
                   <Input id="employee-new-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={8} required />
