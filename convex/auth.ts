@@ -86,28 +86,24 @@ async function sendVerificationEmail({
   url: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
+  if (!apiKey) throw new Error("RESEND_API_KEY is not configured in Convex env.");
 
   const safeUrl = escapeHtml(url);
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `Mailico <auth@${MAIL_DOMAIN}>`,
-        to: [user.email],
-        subject: "Verify your Mailico email address",
-        html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Verify your email address if prompted while signing in:</p><p><a href="${safeUrl}">Verify email address</a></p><p>If you did not create this account, you can ignore this email.</p>`,
-        text: `Verify your Mailico email address: ${url}`,
-      }),
-    });
-    if (!res.ok) console.error("Resend verification email failed", res.status);
-  } catch (error) {
-    console.error("Could not send optional verification email", error);
-  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `Mailico <auth@${MAIL_DOMAIN}>`,
+      to: [user.email],
+      subject: "Verify your Mailico email address",
+      html: `<p>Hi ${escapeHtml(user.name || "there")},</p><p>Verify your email address if prompted while signing in:</p><p><a href="${safeUrl}">Verify email address</a></p><p>If you did not create this account, you can ignore this email.</p>`,
+      text: `Verify your Mailico email address: ${url}`,
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend verification email failed (${res.status}).`);
 }
 
 export const authComponent = createClient<DataModel>(components.betterAuth);

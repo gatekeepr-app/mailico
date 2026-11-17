@@ -59,6 +59,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (signInError) {
+      if (/email not verified|verify.*email/i.test(signInError.message ?? "")) {
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
       setError(signInError.message ?? "Invalid email or password.");
       toast.error(signInError.message ?? "Invalid email or password.");
       return;

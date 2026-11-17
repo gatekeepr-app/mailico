@@ -119,6 +119,9 @@ export default function EmployeeInvitationPage() {
               <p><span className="font-medium">Company address:</span> {invitation.assignedEmail}</p>
               <p><span className="font-medium">Department:</span> {invitation.department}</p>
               <p className="text-muted-foreground">The verification link expires according to the email instructions. After verification, your account can sign in to Mailico.</p>
+              <Button asChild variant="outline" className="min-h-11 w-full rounded-none">
+                <Link href={`/verify-email?email=${encodeURIComponent(invitation.accountEmail)}`}>Resend verification email</Link>
+              </Button>
             </div>
           ) : (
             <div className="space-y-5">

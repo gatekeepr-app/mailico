@@ -7,6 +7,11 @@ export default async function MailPage() {
   if (!(await isAuthenticated())) {
     redirect("/login");
   }
+  const authUser = await fetchAuthQuery(api.auth.getCurrentUser, {});
+  if (!authUser) redirect("/login");
+  if (!authUser.emailVerified) {
+    redirect(`/verify-email?email=${encodeURIComponent(authUser.email)}`);
+  }
   let profileData = await fetchAuthQuery(api.profiles.getMyProfile, {});
   if (!profileData?.companySettings) redirect("/setup");
   if (!profileData.profile) {

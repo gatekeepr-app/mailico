@@ -68,11 +68,29 @@ export default function MailApp() {
   const draftRevisionRef = useRef(0);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDraftSavesRef = useRef(new Map<string, Set<Promise<void>>>());
+  const profileSyncAttemptedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!session?.user) return;
-    void ensureCurrentProfile();
-  }, [ensureCurrentProfile, session?.user]);
+    const user = session?.user;
+    if (!user?.id) return;
+    if (user.emailVerified === false) {
+      router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
+      return;
+    }
+    if (profileSyncAttemptedFor.current === user.id) return;
+    profileSyncAttemptedFor.current = user.id;
+    void ensureCurrentProfile().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Could not prepare your mailbox.";
+      if (/verify your real email/i.test(message)) {
+        router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
+      } else if (/invitation|required/i.test(message)) {
+        router.replace("/invitation-required");
+      } else {
+        profileSyncAttemptedFor.current = null;
+        toast.error(message);
+      }
+    });
+  }, [ensureCurrentProfile, router, session?.user]);
 
   const convexEmails = useMemo<Email[]>(() => {
     return (mailboxEntries.results ?? []).map((entry) => ({
