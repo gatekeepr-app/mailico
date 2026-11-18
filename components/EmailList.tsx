@@ -216,7 +216,7 @@ export default function EmailList({
                         onOpen(email);
                       }
                     }}
-                    className={`group grid min-h-[3.5rem] min-w-0 cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-1 border-l-2 px-1.5 py-2 transition-colors hover:bg-[#f5f8f5] md:min-h-[3.75rem] md:grid-cols-[1.5rem_1.5rem_minmax(8rem,15rem)_minmax(0,1fr)_5.5rem] md:gap-x-2 md:px-3 ${
+                    className={`group grid min-h-[3.5rem] min-w-0 cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-1 border-l-2 px-1.5 py-2 transition-colors hover:bg-[#f5f8f5] md:min-h-[3.75rem] md:grid-cols-[1.5rem_1.5rem_minmax(8rem,12rem)_minmax(0,1fr)_5.5rem] md:gap-x-2 md:px-3 ${
                       active
                         ? "border-l-[#286653] bg-[#e8f1eb]"
                         : `border-l-transparent ${unread ? "bg-[#f7faf7]" : "bg-white"}`
