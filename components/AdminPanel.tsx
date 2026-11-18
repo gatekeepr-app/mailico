@@ -38,7 +38,7 @@ import {
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import EmployeeInvitePanel from "@/components/EmployeeInvitePanel";
 import { authClient } from "@/lib/auth-client";
-import { Pencil } from "lucide-react";
+import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -80,7 +80,6 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
     hasAdminPageAccess ? {} : "skip",
   );
   const createDepartment = useMutation(api.profiles.createDepartment);
-  const updateProfile = useMutation(api.profiles.updateProfileAssignment);
   const reviewEmailRequest = useMutation(api.profiles.reviewEmailAddressRequest);
   const correctCompanyDomain = useMutation(api.profiles.correctUnverifiedCompanyDomain);
   const [departmentName, setDepartmentName] = useState("");
@@ -122,27 +121,6 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
       toast.success("Department created");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create department");
-    }
-  }
-
-  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const profileId = form.get("profileId") as never;
-    const role = form.get("role") as ProfileRole;
-    const departmentValue = form.get("departmentId") as string;
-    const assignedEmail = (form.get("assignedEmail") as string).trim();
-
-    try {
-      await updateProfile({
-        profileId,
-        role,
-        departmentId: departmentValue ? (departmentValue as never) : undefined,
-        assignedEmail: assignedEmail || undefined,
-      });
-      toast.success("Profile updated");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update profile");
     }
   }
 
@@ -202,16 +180,16 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#f5f5f0] px-4 py-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <main className={`min-h-[100dvh] min-w-0 max-w-full bg-[#f5f5f0] ${section === "employees" ? "w-full px-0 py-4" : "px-4 py-8"}`}>
+      <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6">
         <div className="border-b border-[#d9ddd6] pb-5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#557066]">{section === "employees" ? "Team administration" : section === "departments" ? "Team structure" : section === "requests" ? "Access management" : "Workspace settings"}</p>
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+          <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
           <h1 className="text-3xl font-medium tracking-[-0.04em] text-[#20332b]">{section === "employees" ? "Employees" : section === "departments" ? "Departments" : section === "requests" ? "Address requests" : "Mail settings"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {section === "employees"
-              ? <>Assign roles, departments, and company email addresses using <code>@{me?.companySettings?.domain ?? "your company domain"}</code>.</>
+              ? <>Assign roles, departments, and company email addresses using <code className="break-all">@{me?.companySettings?.domain ?? "your company domain"}</code>.</>
               : section === "departments"
                 ? "Create departments and track each department’s HR Lead."
                 : section === "requests"
@@ -219,13 +197,13 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
                   : <>Resend status and sender domain for <code>{me?.companySettings?.domain ?? "your company domain"}</code>.</>}
           </p>
           </div>
-          <div className="border border-[#d9ddd6] bg-white px-4 py-2 text-sm text-[#52635b]">
+          <div className="max-w-full break-words border border-[#d9ddd6] bg-white px-4 py-2 text-sm text-[#52635b]">
             <span className="font-semibold text-[#20332b]">{emailRequests?.length ?? "—"}</span> pending address {emailRequests?.length === 1 ? "request" : "requests"}
           </div>
           </div>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid min-w-0 gap-6">
           {section === "departments" && <Card className="rounded-none border-[#d9ddd6] bg-[#fbfbf8] shadow-none lg:sticky lg:top-6">
             <CardHeader>
               <CardTitle>Departments</CardTitle>
@@ -284,7 +262,7 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
             </CardContent>
           </Card>}
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
           {section === "employees" && me?.companySettings?.isOwner && (
             <EmployeeInvitePanel domain={me.companySettings.domain} departments={departments ?? []} />
           )}
@@ -375,25 +353,25 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
             </CardContent>
           </Card>}
 
-          {section === "employees" && <Card>
-            <CardHeader>
+          {section === "employees" && <Card className="min-w-0 max-w-full overflow-hidden rounded-none border-[#d9ddd6] shadow-none">
+            <CardHeader className="min-w-0 px-3 sm:px-5">
               <CardTitle>Employees</CardTitle>
               <CardDescription>
-              Only {me?.companySettings?.ownerEmail ?? "the business owner"} can manage employee admin status. Chief can
-                manage non-admin roles, departments, and company email
-                assignments. HR lead can manage departments and company email
-                assignments.
+                Manage employee roles, departments, company addresses, and account access.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Table>
+            <CardContent className="min-w-0 space-y-4 px-3 sm:px-5">
+              <Table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[40%]" />
+                  <col className="w-[27%]" />
+                  <col className="w-[33%]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-60">Employee</TableHead>
-                    <TableHead className="min-w-36">Role</TableHead>
-                    <TableHead className="min-w-44">Department</TableHead>
-                    <TableHead className="min-w-64">Company email</TableHead>
-                    <TableHead className="w-24 text-right">Action</TableHead>
+                    <TableHead className="overflow-hidden px-2 sm:px-4">Employee</TableHead>
+                    <TableHead className="overflow-hidden px-2 sm:px-4">Company email</TableHead>
+                    <TableHead className="px-1 text-right text-[11px] sm:px-3 sm:text-sm">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -404,7 +382,7 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
                       departments={departments ?? []}
                       domain={me?.companySettings?.domain ?? ""}
                       userCanChangeRoles={userCanChangeRoles}
-                      onUpdate={handleUpdate}
+                      canRemove={Boolean(me.companySettings?.isOwner)}
                     />
                   ))}
                 </TableBody>
@@ -433,29 +411,56 @@ function EmployeeRow({
   departments,
   domain,
   userCanChangeRoles,
-  onUpdate,
+  canRemove,
 }: {
   profile: ProfileWithDepartment;
   departments: DepartmentSummary[];
   domain: string;
   userCanChangeRoles: boolean;
-  onUpdate: (event: FormEvent<HTMLFormElement>) => void;
+  canRemove: boolean;
 }) {
+  const updateProfile = useMutation(api.profiles.updateProfileAssignment);
+  const removeEmployee = useMutation(api.profiles.removeEmployee);
   const [role, setRole] = useState<ProfileRole>(profile.role);
   const [departmentId, setDepartmentId] = useState<string>(profile.departmentId ?? "none");
   const [assignedEmail, setAssignedEmail] = useState(
     profile.assignedEmail?.split("@")[0] ?? "",
   );
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const roleLocked = !userCanChangeRoles || profile.role === "admin";
-  const initialRole = profile.role;
-  const initialDepartmentId = profile.departmentId ?? "none";
-  const initialAssignedEmail = profile.assignedEmail?.split("@")[0] ?? "";
   const departmentHeadTitle = departments.find((department) => department._id === departmentId)?.headTitle ?? "Department head";
   const [resetting, setResetting] = useState(false);
-  const hasChanges =
-    role !== initialRole ||
-    departmentId !== initialDepartmentId ||
-    assignedEmail.trim() !== initialAssignedEmail;
+
+  function setDialogOpen(open: boolean) {
+    if (open) {
+      setRole(profile.role);
+      setDepartmentId(profile.departmentId ?? "none");
+      setAssignedEmail(profile.assignedEmail?.split("@")[0] ?? "");
+    }
+    setEditOpen(open);
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await updateProfile({
+        profileId: profile._id,
+        role,
+        departmentId: departmentId === "none" ? undefined : departmentId as Id<"departments">,
+        assignedEmail: assignedEmail.trim() || undefined,
+      });
+      setEditOpen(false);
+      toast.success("Employee updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update employee");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function sendReset() {
     setResetting(true);
@@ -473,80 +478,122 @@ function EmployeeRow({
     }
   }
 
+  async function confirmRemoval() {
+    setRemoving(true);
+    try {
+      await removeEmployee({ profileId: profile._id });
+      setDeleteOpen(false);
+      toast.success("Employee access removed. Their mailbox history is retained.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove employee access");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  const department = departments.find((item) => item._id === profile.departmentId);
+  const roleLabel = profile.role === "admin"
+    ? "Owner"
+    : profile.role === "hrLead"
+      ? department?.headTitle ?? "Department head"
+      : profile.role === "chief"
+        ? "Chief"
+        : profile.role === "hr"
+          ? "HR"
+          : "Employee";
+
   return (
-    <TableRow>
-      <TableCell>
-        <form id={`employee-${profile._id}`} onSubmit={onUpdate}>
-          <input type="hidden" name="profileId" value={profile._id} />
-          <input type="hidden" name="role" value={role} />
-          <input
-            type="hidden"
-            name="departmentId"
-            value={departmentId === "none" ? "" : departmentId}
-          />
-        </form>
-        <div className="flex items-center gap-3">
-          <Avatar name={profile.name} size="md" />
+    <TableRow className="min-w-0">
+      <TableCell className="overflow-hidden px-2 py-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <Avatar name={profile.name} size="sm" className="hidden shrink-0 sm:flex" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{profile.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{profile.accountEmail}</p>
+            <p className="truncate text-xs font-semibold text-[#24352e] sm:text-sm">{profile.name}</p>
+            <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{profile.accountEmail}</p>
+            <p className="mt-0.5 truncate text-[10px] text-[#718078] sm:text-xs">{roleLabel}{department ? ` · ${department.name}` : ""}</p>
           </div>
         </div>
       </TableCell>
-      <TableCell>
-        <Select
-          value={role}
-          onValueChange={(value) => setRole(value as ProfileRole)}
-          disabled={roleLocked}
-        >
-          <SelectTrigger aria-label={`Role for ${profile.name}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="user">User</SelectItem>
-            <SelectItem value="hrLead">{departmentHeadTitle}</SelectItem>
-            <SelectItem value="chief">Chief</SelectItem>
-            {profile.role === "hr" && <SelectItem value="hr">HR</SelectItem>}
-            {profile.role === "admin" && <SelectItem value="admin">Admin</SelectItem>}
-          </SelectContent>
-        </Select>
+      <TableCell className="overflow-hidden px-2 py-3 sm:px-4">
+        <span className="block break-all text-[10px] leading-4 text-[#286653] sm:text-xs">{profile.assignedEmail ?? "Unassigned"}</span>
       </TableCell>
-      <TableCell>
-        <Select value={departmentId} onValueChange={setDepartmentId}>
-          <SelectTrigger aria-label={`Department for ${profile.name}`}>
-            <SelectValue placeholder="None" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">None</SelectItem>
-            {departments.map((department) => (
-              <SelectItem key={department._id} value={department._id}>
-                {department.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell>
-        <div className="flex overflow-hidden rounded-lg border bg-background">
-          <Input
-            form={`employee-${profile._id}`}
-            name="assignedEmail"
-            value={assignedEmail}
-            onChange={(event) => setAssignedEmail(event.target.value)}
-            placeholder="firstname.lastname"
-            className="border-0 shadow-none focus-visible:ring-0"
-          />
-          <span className="flex items-center border-l px-2 text-xs text-muted-foreground">
-            @{domain}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={resetting} onClick={() => void sendReset()}>
-            {resetting ? "Sending…" : "Reset password"}
+      <TableCell className="px-1 py-2 text-right sm:px-3">
+        <div className="flex items-center justify-end gap-0 sm:gap-1">
+          <Dialog open={editOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-xs" aria-label={`Edit ${profile.name}`} title="Edit employee">
+                <Pencil className="size-3.5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+              <form onSubmit={save} className="space-y-5">
+                <DialogHeader>
+                  <DialogTitle>Edit employee</DialogTitle>
+                  <DialogDescription>Update {profile.name}’s role, department, and company email address.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor={`employee-role-${profile._id}`}>Role</Label>
+                    <Select value={role} onValueChange={(value) => setRole(value as ProfileRole)} disabled={roleLocked}>
+                      <SelectTrigger id={`employee-role-${profile._id}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">Employee</SelectItem>
+                        <SelectItem value="hrLead">{departmentHeadTitle}</SelectItem>
+                        <SelectItem value="chief">Chief</SelectItem>
+                        {profile.role === "hr" && <SelectItem value="hr">HR</SelectItem>}
+                        {profile.role === "admin" && <SelectItem value="admin">Owner</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                    {roleLocked && <p className="text-xs text-muted-foreground">Only the business owner can change this role.</p>}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`employee-department-${profile._id}`}>Department</Label>
+                    <Select value={departmentId} onValueChange={setDepartmentId}>
+                      <SelectTrigger id={`employee-department-${profile._id}`}><SelectValue placeholder="Choose a department" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No department</SelectItem>
+                        {departments.map((item) => <SelectItem key={item._id} value={item._id}>{item.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`employee-company-email-${profile._id}`}>Company email</Label>
+                    <div className="flex min-w-0 overflow-hidden border bg-background">
+                      <Input id={`employee-company-email-${profile._id}`} value={assignedEmail} onChange={(event) => setAssignedEmail(event.target.value)} placeholder="first.last" className="min-w-0 border-0 shadow-none focus-visible:ring-0" />
+                      <span className="flex max-w-[50%] items-center break-all border-l px-2 text-xs text-muted-foreground">@{domain}</span>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Button type="button" variant="ghost" size="icon-xs" disabled={resetting} onClick={() => void sendReset()} aria-label={`Send password reset to ${profile.accountEmail}`} title="Send password reset">
+            <KeyRound className="size-3.5" />
           </Button>
-          <Button type="submit" form={`employee-${profile._id}`} disabled={!hasChanges}>Save</Button>
+          {canRemove && profile.role !== "admin" && (
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <DialogTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${profile.name}`} title="Remove employee" className="text-[#9b4340] hover:text-[#7b2f2d]">
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Remove employee access?</DialogTitle>
+                  <DialogDescription>
+                    {profile.name} will no longer be able to sign in to this workspace. Their email address stays reserved and their mailbox history is retained.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)} disabled={removing}>Cancel</Button>
+                  <Button type="button" variant="destructive" onClick={() => void confirmRemoval()} disabled={removing}>{removing ? "Removing…" : "Remove access"}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </TableCell>
     </TableRow>

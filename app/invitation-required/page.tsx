@@ -9,13 +9,13 @@ export default function InvitationRequiredPage() {
       <Card className="w-full max-w-lg rounded-none border-[#d9ddd6] shadow-none">
         <CardHeader>
           <span className="mb-2 flex size-10 items-center justify-center bg-[#193e37] text-white"><EnvelopeSimple size={19} /></span>
-          <CardTitle className="text-2xl font-medium">An employee invitation is required</CardTitle>
+          <CardTitle className="text-2xl font-medium">Workspace access is required</CardTitle>
           <CardDescription>
-            Mailico company accounts are created by the business administrator. Ask them to invite your real email address and assign your company email.
+            Mailico company accounts are invite-only. Ask your administrator to invite or restore access for your primary email address.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          If you already received an invitation, open its link again or ask the administrator to resend it.
+          If your access was removed, your administrator can reissue an invitation. Your company email and mailbox history will be restored with your account.
         </CardContent>
         <CardFooter className="border-t border-[#e5e8e1] pt-4">
           <Button asChild className="min-h-11 rounded-none bg-[#286653] text-white hover:bg-[#1f5544]">

@@ -17,6 +17,14 @@ async function getProfile(ctx: Ctx, authUserId: string) {
     .unique();
 }
 
+async function requireActiveProfile(ctx: Ctx, authUserId: string) {
+  const profile = await getProfile(ctx, authUserId);
+  if (!profile || profile.deactivatedAt) {
+    throw new ConvexError("Workspace access has been removed or the employee profile is unavailable.");
+  }
+  return profile;
+}
+
 async function getCompanySettings(ctx: Ctx) {
   return await ctx.db
     .query("companySettings")
@@ -125,7 +133,7 @@ export const listMailboxEntries = query({
       return { page: [], isDone: true, continueCursor: "" };
     }
     const profile = await getProfile(ctx, user._id);
-    if (!profile) return { page: [], isDone: true, continueCursor: "" };
+    if (!profile || profile.deactivatedAt) return { page: [], isDone: true, continueCursor: "" };
 
     const settings = await getCompanySettings(ctx);
     const isAdmin = profile.role === "admin" &&
@@ -291,6 +299,8 @@ export const getMessageByIdempotencyKey = query({
   handler: async (ctx, args) => {
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user?._id) return null;
+    const profile = await getProfile(ctx, user._id);
+    if (!profile || profile.deactivatedAt) return null;
     const message = await ctx.db
       .query("messages")
       .withIndex("by_idempotencyKey", (q) => q.eq("idempotencyKey", args.idempotencyKey))
@@ -315,8 +325,7 @@ export const getMessage = query({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
-    const profile = await getProfile(ctx, user._id);
-    if (!profile) throw new ConvexError("Profile not found.");
+    const profile = await requireActiveProfile(ctx, user._id);
     const message = await requireVisibleMessage(ctx, args.messageId, user, profile);
     const settings = await getCompanySettings(ctx);
     const isAdmin = profile.role === "admin" &&
@@ -336,8 +345,7 @@ export const setMailboxState = mutation({
   },
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
-    const profile = await getProfile(ctx, user._id);
-    if (!profile) throw new ConvexError("Profile not found.");
+    const profile = await requireActiveProfile(ctx, user._id);
     const message = await requireVisibleMessage(ctx, args.messageId, user, profile);
 
     const existing = await getMailboxState(ctx, user._id, args.messageId);
@@ -359,8 +367,8 @@ export const setMailboxState = mutation({
 export const consumeSendQuota = internalMutation({
   args: { authUserId: v.string() },
   handler: async (ctx, args) => {
-    const profile = await getProfile(ctx, args.authUserId);
-    if (!profile?.assignedEmail) {
+    const profile = await requireActiveProfile(ctx, args.authUserId);
+    if (!profile.assignedEmail) {
       throw new ConvexError("No company email is assigned to this user.");
     }
     const now = Date.now();
@@ -401,9 +409,9 @@ export const recordSentMessage = internalMutation({
     body: v.string(),
   },
   handler: async (ctx, args) => {
-    const profile = await getProfile(ctx, args.authUserId);
+    const profile = await requireActiveProfile(ctx, args.authUserId);
     const settings = await getCompanySettings(ctx);
-    if (!profile?.assignedEmail) {
+    if (!profile.assignedEmail) {
       throw new ConvexError("No company email is assigned to this user.");
     }
     if (!settings || !profile.assignedEmail.toLowerCase().endsWith(`@${settings.domain}`)) {
@@ -650,6 +658,8 @@ export const listDrafts = query({
   handler: async (ctx) => {
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user?._id) return [];
+    const profile = await getProfile(ctx, user._id);
+    if (!profile || profile.deactivatedAt) return [];
 
     return await ctx.db
       .query("drafts")
@@ -671,6 +681,7 @@ export const upsertDraft = mutation({
   },
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
+    await requireActiveProfile(ctx, user._id);
     const now = Date.now();
     const existing = await ctx.db
       .query("drafts")
@@ -707,6 +718,7 @@ export const deleteDraft = mutation({
   args: { draftKey: v.string() },
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
+    await requireActiveProfile(ctx, user._id);
     const existing = await ctx.db
       .query("drafts")
       .withIndex("by_owner_draftKey", (q) =>

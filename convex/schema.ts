@@ -44,6 +44,7 @@ export default defineSchema({
     ),
     departmentId: v.optional(v.id("departments")),
     assignedEmail: v.optional(v.string()),
+    deactivatedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

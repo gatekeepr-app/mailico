@@ -47,9 +47,13 @@ function canAccessAdminPage(_email: string, role: string | undefined) {
 
 type Ctx = QueryCtx | MutationCtx;
 
-async function requireAuth(ctx: Ctx) {
+async function requireAuth(ctx: Ctx, allowDeactivated = false) {
   const user = await authComponent.getAuthUser(ctx);
   if (!user?._id) throw new ConvexError("Not authenticated.");
+  const profile = await getProfileByAuthUserId(ctx, user._id);
+  if (profile?.deactivatedAt && !allowDeactivated) {
+    throw new ConvexError("Workspace access has been removed. Contact your administrator.");
+  }
   return user;
 }
 
@@ -86,13 +90,48 @@ async function requireStaff(ctx: Ctx) {
 export const ensureCurrentProfile = mutation({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuth(ctx, true);
     if (!user.emailVerified) throw new ConvexError("Verify your real email address before opening Mailico.");
     const existing = await getProfileByAuthUserId(ctx, user._id);
     const settings = await getCompanySettings(ctx);
     const now = Date.now();
 
     if (existing) {
+      if (existing.deactivatedAt) {
+        const invitation = await ctx.db.query("employeeInvitations")
+          .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", user.email.toLowerCase()).eq("status", "pending"))
+          .first();
+        if (!invitation || invitation.expiresAt <= now) {
+          throw new ConvexError("Workspace access has been removed. Ask your administrator to invite you again.");
+        }
+        if (invitation.assignedEmail !== existing.assignedEmail) {
+          throw new ConvexError("Reinstate this employee with their existing company email address to preserve mailbox history.");
+        }
+        if (invitation.role === "hrLead") {
+          const departmentProfiles = await ctx.db.query("userProfiles")
+            .withIndex("by_department", (q) => q.eq("departmentId", invitation.departmentId))
+            .take(200);
+          for (const currentLead of departmentProfiles.filter((item) => item._id !== existing._id && !item.deactivatedAt && item.role === "hrLead")) {
+            await ctx.db.patch(currentLead._id, { role: "user", updatedAt: now });
+          }
+        }
+        await ctx.db.patch(existing._id, {
+          accountEmail: user.email,
+          accountEmailNormalized: user.email.toLowerCase(),
+          name: invitation.name,
+          role: invitation.role,
+          departmentId: invitation.departmentId,
+          assignedEmail: invitation.assignedEmail,
+          deactivatedAt: undefined,
+          updatedAt: now,
+        });
+        await ctx.db.patch(invitation._id, {
+          status: "accepted",
+          acceptedAuthUserId: user._id,
+          updatedAt: now,
+        });
+        return await ctx.db.get(existing._id);
+      }
       const name = user.name || user.email.split("@")[0];
       const role = settings
         ? settings.ownerAuthUserId === user._id ? "admin" : existing.role === "admin" ? "user" : existing.role
@@ -207,7 +246,10 @@ export const setEmployeeInvitationPrimaryEmail = mutation({
     const existingProfile = await ctx.db.query("userProfiles")
       .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", email))
       .unique();
-    if (existingProfile) throw new ConvexError("This email already has a Mailico account. Sign in to accept the invitation.");
+    if (existingProfile && !existingProfile.deactivatedAt) throw new ConvexError("This email already has a Mailico account. Sign in to accept the invitation.");
+    if (existingProfile && invitation.assignedEmail !== existingProfile.assignedEmail) {
+      throw new ConvexError("Reinstated employees must keep their existing company email address to preserve mailbox history.");
+    }
     const existingInvitation = await ctx.db.query("employeeInvitations")
       .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", email).eq("status", "pending"))
       .first();
@@ -271,11 +313,14 @@ export const createEmployeeInvitation = mutation({
     const existingProfile = await ctx.db.query("userProfiles")
       .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", emailNormalized))
       .unique();
-    if (existingProfile) throw new ConvexError("An account already exists for this real email.");
+    if (existingProfile && !existingProfile.deactivatedAt) throw new ConvexError("An account already exists for this real email.");
+    if (existingProfile && existingProfile.assignedEmail !== assignedEmail) {
+      throw new ConvexError("Reinstated employees must keep their existing company email address to preserve mailbox history.");
+    }
     const assignedProfile = await ctx.db.query("userProfiles")
       .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", assignedEmail))
       .unique();
-    if (assignedProfile) throw new ConvexError("That company email is already assigned.");
+    if (assignedProfile && assignedProfile._id !== existingProfile?._id) throw new ConvexError("That company email is already assigned.");
 
     const now = Date.now();
     const existingInvite = await ctx.db.query("employeeInvitations")
@@ -687,7 +732,7 @@ export const listProfiles = query({
     const departmentsById = new Map(departments.map((d) => [d._id, d]));
     return {
       ...profilePage,
-      page: profilePage.page.map((profile) => ({
+      page: profilePage.page.filter((profile) => !profile.deactivatedAt).map((profile) => ({
         ...profile,
         department: profile.departmentId
           ? departmentsById.get(profile.departmentId) ?? null
@@ -712,7 +757,7 @@ export const listDepartments = query({
     return departments.map((department) => ({
       ...department,
       headTitle: department.headTitle?.trim() || "Department head",
-      hrLeadName: profiles.find((profile) => profile.departmentId === department._id && profile.role === "hrLead")?.name,
+      hrLeadName: profiles.find((profile) => !profile.deactivatedAt && profile.departmentId === department._id && profile.role === "hrLead")?.name,
       pendingHrLeadName: invitations.find((invite) => invite.departmentId === department._id && invite.role === "hrLead")?.name,
     }));
   },
@@ -785,6 +830,7 @@ export const updateProfileAssignment = mutation({
     const { user, profile: actor } = await requireStaff(ctx);
     const target = await ctx.db.get(args.profileId);
     if (!target) throw new ConvexError("User profile not found.");
+    if (target.deactivatedAt) throw new ConvexError("This employee no longer has workspace access.");
     const settings = await getCompanySettings(ctx);
     const targetIsAdminAccount = Boolean(settings && settings.ownerAuthUserId === target.authUserId);
     const actorIsAdmin = Boolean(settings && settings.ownerAuthUserId === user._id);
@@ -873,5 +919,47 @@ export const updateProfileAssignment = mutation({
       assignedEmail,
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const removeEmployee = mutation({
+  args: { profileId: v.id("userProfiles") },
+  handler: async (ctx, args) => {
+    const { user } = await requireStaff(ctx);
+    const settings = await getCompanySettings(ctx);
+    if (!settings || settings.ownerAuthUserId !== user._id) {
+      throw new ConvexError("Only the business owner can remove employee access.");
+    }
+    const target = await ctx.db.get(args.profileId);
+    if (!target) throw new ConvexError("Employee not found.");
+    if (target.authUserId === settings.ownerAuthUserId || target.role === "admin") {
+      throw new ConvexError("The business owner account cannot be removed.");
+    }
+    if (target.deactivatedAt) throw new ConvexError("This employee already has access removed.");
+
+    if (target.role === "hrLead" && target.departmentId) {
+      const [departmentProfiles, pendingInvites] = await Promise.all([
+        ctx.db.query("userProfiles")
+          .withIndex("by_department", (q) => q.eq("departmentId", target.departmentId))
+          .take(200),
+        ctx.db.query("employeeInvitations")
+          .withIndex("by_department_status", (q) => q.eq("departmentId", target.departmentId).eq("status", "pending"))
+          .filter((q) => q.and(q.eq(q.field("role"), "hrLead"), q.gt(q.field("expiresAt"), Date.now())))
+          .take(200),
+      ]);
+      const hasReplacementLead = departmentProfiles.some((profile) => profile._id !== target._id && !profile.deactivatedAt && profile.role === "hrLead") || pendingInvites.length > 0;
+      if (!hasReplacementLead) {
+        throw new ConvexError("Invite a replacement department lead before removing this employee.");
+      }
+    }
+
+    const subscriptions = await ctx.db.query("pushSubscriptions")
+      .withIndex("by_auth_user", (q) => q.eq("authUserId", target.authUserId))
+      .take(100);
+    for (const subscription of subscriptions) await ctx.db.delete(subscription._id);
+
+    const removedAt = Date.now();
+    await ctx.db.patch(target._id, { deactivatedAt: removedAt, updatedAt: removedAt });
+    return { removed: true, mailboxHistoryRetained: true };
   },
 });

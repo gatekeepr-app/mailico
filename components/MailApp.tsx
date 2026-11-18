@@ -75,6 +75,10 @@ export default function MailApp() {
   const profileSyncAttemptedFor = useRef<string | null>(null);
 
   useEffect(() => {
+    if (profileData?.profile?.deactivatedAt) {
+      router.replace("/invitation-required");
+      return;
+    }
     const user = session?.user;
     if (!user?.id) return;
     if (user.emailVerified === false) {
@@ -87,14 +91,14 @@ export default function MailApp() {
       const message = error instanceof Error ? error.message : "Could not prepare your mailbox.";
       if (/verify your real email/i.test(message)) {
         router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
-      } else if (/invitation|required/i.test(message)) {
+      } else if (/invitation|required|workspace access has been removed/i.test(message)) {
         router.replace("/invitation-required");
       } else {
         profileSyncAttemptedFor.current = null;
         toast.error(message);
       }
     });
-  }, [ensureCurrentProfile, router, session?.user]);
+  }, [ensureCurrentProfile, profileData?.profile?.deactivatedAt, router, session?.user]);
 
   const convexEmails = useMemo<Email[]>(() => {
     return (mailboxEntries.results ?? []).map((entry) => ({
