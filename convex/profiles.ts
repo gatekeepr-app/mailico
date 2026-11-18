@@ -938,12 +938,13 @@ export const removeEmployee = mutation({
     if (target.deactivatedAt) throw new ConvexError("This employee already has access removed.");
 
     if (target.role === "hrLead" && target.departmentId) {
+      const departmentId = target.departmentId;
       const [departmentProfiles, pendingInvites] = await Promise.all([
         ctx.db.query("userProfiles")
-          .withIndex("by_department", (q) => q.eq("departmentId", target.departmentId))
+          .withIndex("by_department", (q) => q.eq("departmentId", departmentId))
           .take(200),
         ctx.db.query("employeeInvitations")
-          .withIndex("by_department_status", (q) => q.eq("departmentId", target.departmentId).eq("status", "pending"))
+          .withIndex("by_department_status", (q) => q.eq("departmentId", departmentId).eq("status", "pending"))
           .filter((q) => q.and(q.eq(q.field("role"), "hrLead"), q.gt(q.field("expiresAt"), Date.now())))
           .take(200),
       ]);
