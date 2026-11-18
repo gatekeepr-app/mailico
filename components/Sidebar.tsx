@@ -9,7 +9,6 @@ import {
   Pencil,
   X,
   Building2,
-  Mail,
 } from "lucide-react";
 import { folderLabel } from "@/lib/mail";
 import type { FolderKey } from "@/lib/types";
@@ -47,17 +46,8 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64 xl:w-[min(20vw,24rem)]"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
-      <div className="px-3 pb-3 pt-6 md:px-4 md:pt-7">
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => { onNavigate("inbox"); onClose(); }}
-            aria-label="Mailico inbox"
-            className="flex min-h-10 items-center gap-2 text-[#24352e]"
-          >
-            <Mail className="size-6 shrink-0 text-[#286653]" />
-            <span className={`${mobileDrawer ? "block" : "hidden md:block"} text-lg font-semibold tracking-[-0.03em]`}>Mailico</span>
-          </button>
+      <div className="px-3 pb-3 pt-4 md:px-4 md:pt-5">
+        <div className={`${mobileDrawer ? "mb-4 flex min-h-10 items-center justify-end" : "hidden"}`}>
           <button
             onClick={onClose}
             aria-label="Close navigation"
