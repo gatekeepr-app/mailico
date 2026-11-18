@@ -719,20 +719,32 @@ export const listDepartments = query({
 });
 
 export const updateDepartmentHeadTitle = mutation({
-  args: { departmentId: v.id("departments"), title: v.string() },
+  args: { departmentId: v.id("departments"), name: v.string(), title: v.string() },
   handler: async (ctx, args) => {
     const { profile } = await requireStaff(ctx);
     if (profile?.role !== "admin" && profile?.role !== "chief") {
-      throw new ConvexError("Only the business owner or chief can update department positions.");
+      throw new ConvexError("Only the business owner or chief can update departments.");
     }
     const department = await ctx.db.get(args.departmentId);
     if (!department) throw new ConvexError("Department not found.");
+    const name = args.name.trim().replace(/\s+/g, " ");
+    const slug = slugify(name);
+    if (name.length < 2 || name.length > 100 || !slug) {
+      throw new ConvexError("Department name must be between 2 and 100 characters.");
+    }
+    const duplicate = await ctx.db
+      .query("departments")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (duplicate && duplicate._id !== department._id) {
+      throw new ConvexError("A department with that name already exists.");
+    }
     const title = args.title.trim().replace(/\s+/g, " ");
     if (title.length < 2 || title.length > 60) {
       throw new ConvexError("Position title must be between 2 and 60 characters.");
     }
-    await ctx.db.patch(department._id, { headTitle: title });
-    return { headTitle: title };
+    await ctx.db.patch(department._id, { name, slug, headTitle: title });
+    return { name, headTitle: title };
   },
 });
 

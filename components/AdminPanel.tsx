@@ -38,6 +38,16 @@ import {
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import EmployeeInvitePanel from "@/components/EmployeeInvitePanel";
 import { authClient } from "@/lib/auth-client";
+import { Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export type AdminSection = "overview" | "employees" | "departments" | "requests" | "settings";
 
@@ -246,15 +256,25 @@ export default function AdminPanel({ section = "overview" }: { section?: AdminSe
                     <ul className="divide-y">
                       {departments.map((department) => (
                         <li key={department._id} className="px-3 py-2 text-sm">
-                          <p className="font-medium">{department.name}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {department.hrLeadName
-                              ? `${department.headTitle ?? "Department head"}: ${department.hrLeadName}`
-                              : department.pendingHrLeadName
-                                ? `${department.headTitle ?? "Department head"} invitation pending: ${department.pendingHrLeadName}`
-                                : `No ${department.headTitle ?? "department head"} assigned`}
-                          </p>
-                          {userCanChangeRoles && <DepartmentPositionEditor departmentId={department._id} initialTitle={department.headTitle ?? "Department head"} />}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium">{department.name}</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {department.hrLeadName
+                                  ? `${department.headTitle ?? "Department head"}: ${department.hrLeadName}`
+                                  : department.pendingHrLeadName
+                                    ? `${department.headTitle ?? "Department head"} invitation pending: ${department.pendingHrLeadName}`
+                                    : `No ${department.headTitle ?? "department head"} assigned`}
+                              </p>
+                            </div>
+                            {userCanChangeRoles && (
+                              <DepartmentEditor
+                                departmentId={department._id}
+                                initialName={department.name}
+                                initialTitle={department.headTitle ?? "Department head"}
+                              />
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -533,31 +553,59 @@ function EmployeeRow({
   );
 }
 
-function DepartmentPositionEditor({ departmentId, initialTitle }: { departmentId: Id<"departments">; initialTitle: string }) {
-  const updateTitle = useMutation(api.profiles.updateDepartmentHeadTitle);
+function DepartmentEditor({ departmentId, initialName, initialTitle }: { departmentId: Id<"departments">; initialName: string; initialTitle: string }) {
+  const updateDepartment = useMutation(api.profiles.updateDepartmentHeadTitle);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(initialName);
   const [title, setTitle] = useState(initialTitle);
   const [saving, setSaving] = useState(false);
-  const unchanged = title.trim().replace(/\s+/g, " ") === initialTitle;
+  const unchanged = name.trim().replace(/\s+/g, " ") === initialName && title.trim().replace(/\s+/g, " ") === initialTitle;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     try {
-      const result = await updateTitle({ departmentId, title });
+      const result = await updateDepartment({ departmentId, name, title });
+      setName(result.name);
       setTitle(result.headTitle);
-      toast.success("Department position updated");
+      setOpen(false);
+      toast.success("Department updated");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update position title");
+      toast.error(error instanceof Error ? error.message : "Could not update department");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={save} className="mt-2 flex items-center gap-2">
-      <Input aria-label="Department head position title" value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} className="h-9 min-w-0" />
-      <Button type="submit" size="sm" variant="outline" disabled={saving || unchanged}>{saving ? "Saving…" : "Save title"}</Button>
-    </form>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${initialName}`} title="Edit department">
+          <Pencil className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <form onSubmit={save} className="space-y-5">
+          <DialogHeader>
+            <DialogTitle>Edit department</DialogTitle>
+            <DialogDescription>Update the department name and the title used for its department lead.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor={`department-name-${departmentId}`}>Department name</Label>
+              <Input id={`department-name-${departmentId}`} value={name} maxLength={100} onChange={(event) => setName(event.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`department-title-${departmentId}`}>Department position</Label>
+              <Input id={`department-title-${departmentId}`} value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} required />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={saving || unchanged}>{saving ? "Saving…" : "Save changes"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
