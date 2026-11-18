@@ -501,6 +501,19 @@ export default function MailApp() {
         onGoInbox={() => navigate("inbox")}
         userEmail={userEmail}
         userName={userName}
+        userCompanyEmail={profileData?.profile?.assignedEmail ?? null}
+        userDepartment={profileData?.department?.name ?? null}
+        userRole={profileData?.profile?.role === "hrLead"
+          ? (profileData?.department?.headTitle ?? "Department head")
+          : profileData?.profile?.role === "admin"
+            ? "Owner"
+            : profileData?.profile?.role === "chief"
+              ? "Chief"
+              : profileData?.profile?.role === "hr"
+                ? "HR"
+                : profileData?.profile?.role === "user"
+                  ? "Employee"
+                  : null}
         isStaff={canAccessAdminPage(userEmail, profileData?.profile?.role)}
         onSignOut={handleSignOut}
       />

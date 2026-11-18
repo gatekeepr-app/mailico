@@ -9,6 +9,7 @@ import {
   Pencil,
   X,
   Building2,
+  Mail,
 } from "lucide-react";
 import { folderLabel } from "@/lib/mail";
 import type { FolderKey } from "@/lib/types";
@@ -46,28 +47,41 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <aside className={`${mobileDrawer ? "w-[min(20rem,85vw)]" : "w-16 md:w-64 xl:w-[min(20vw,24rem)]"} shrink-0 border-r border-[#e3e9e4] bg-[#fbfcfa]`}>
-      <div className="flex items-center justify-between p-3 md:px-4">
-        <button
-          onClick={onCompose}
-          className={`${mobileDrawer ? "flex" : "hidden md:flex"} min-h-11 items-center gap-2 rounded-full bg-[#dcebe2] px-5 py-3 text-sm font-semibold text-[#245b49] shadow-sm transition hover:bg-[#cfe3d7]`}
-        >
-          <Pencil className="h-5 w-5" />
-          Compose
-        </button>
-        <button
-          onClick={onCompose}
-          aria-label="Compose"
-          className={`${mobileDrawer ? "hidden" : "md:hidden"} min-h-11 min-w-11 rounded-full bg-[#dcebe2] p-3 text-[#245b49] transition hover:bg-[#cfe3d7]`}
-        >
-          <Pencil className="h-5 w-5" />
-        </button>
-        <button
-          onClick={onClose}
-          aria-label="Close navigation"
-          className={`${mobileDrawer ? "" : "md:hidden"} min-h-11 min-w-11 rounded-full p-2 text-[#718078] hover:bg-[#f0f4f1]`}
-        >
-          <X className="h-5 w-5" />
-        </button>
+      <div className="px-3 pb-3 pt-6 md:px-4 md:pt-7">
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => { onNavigate("inbox"); onClose(); }}
+            aria-label="Mailico inbox"
+            className="flex min-h-10 items-center gap-2 text-[#24352e]"
+          >
+            <Mail className="size-6 shrink-0 text-[#286653]" />
+            <span className={`${mobileDrawer ? "block" : "hidden md:block"} text-lg font-semibold tracking-[-0.03em]`}>Mailico</span>
+          </button>
+          <button
+            onClick={onClose}
+            aria-label="Close navigation"
+            className={`${mobileDrawer ? "" : "md:hidden"} min-h-11 min-w-11 rounded-full p-2 text-[#718078] hover:bg-[#f0f4f1]`}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex items-center">
+          <button
+            onClick={onCompose}
+            className={`${mobileDrawer ? "flex" : "hidden md:flex"} min-h-11 items-center gap-2 rounded-full bg-[#dcebe2] px-5 py-3 text-sm font-semibold text-[#245b49] shadow-sm transition hover:bg-[#cfe3d7]`}
+          >
+            <Pencil className="h-5 w-5" />
+            <span>Compose</span>
+          </button>
+          <button
+            onClick={onCompose}
+            aria-label="Compose"
+            className={`${mobileDrawer ? "hidden" : "md:hidden"} min-h-11 min-w-11 rounded-full bg-[#dcebe2] p-3 text-[#245b49] transition hover:bg-[#cfe3d7]`}
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <nav className="mt-2 space-y-1 px-2 md:px-3">

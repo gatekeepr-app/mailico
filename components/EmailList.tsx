@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ChevronDown,
@@ -75,15 +75,24 @@ export default function EmailList({
   onLoadMore,
 }: EmailListProps) {
   const [category, setCategory] = useState<Category>("primary");
+  const [isMobile, setIsMobile] = useState(true);
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const allThreads = useMemo(() => groupEmailsIntoThreads(emails), [emails]);
+  const activeCategory = isMobile ? "primary" : category;
   const threads = useMemo(
-    () => folder === "inbox" && category !== "primary"
-      ? allThreads.filter((thread) => categoryFor(thread.latest) === category)
+    () => folder === "inbox" && activeCategory !== "primary"
+      ? allThreads.filter((thread) => categoryFor(thread.latest) === activeCategory)
       : folder === "inbox"
         ? allThreads.filter((thread) => categoryFor(thread.latest) === "primary")
         : allThreads,
-    [allThreads, category, folder],
+    [allThreads, activeCategory, folder],
   );
   const threadContextByKey = new Map(
     groupEmailsIntoThreads(threadContextEmails).map((thread) => [thread.key, thread] as const),
@@ -96,7 +105,7 @@ export default function EmailList({
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-white">
       <div className="flex min-h-14 shrink-0 items-center gap-1 border-b border-[#e3e9e4] px-3 sm:px-5">
-        <label className="flex min-h-11 min-w-11 items-center justify-center" aria-label="Select all conversations">
+        <label className="hidden min-h-11 min-w-11 items-center justify-center md:flex" aria-label="Select all conversations">
           <input
             aria-label="Select all conversations in the current view"
             type="checkbox"
@@ -106,7 +115,7 @@ export default function EmailList({
             className="h-5 w-5 accent-[#286653]"
           />
         </label>
-        <div className="relative">
+        <div className="relative hidden md:block">
           <button
             type="button"
             aria-label="Selection options"
@@ -135,7 +144,7 @@ export default function EmailList({
             </div>
           )}
         </div>
-        <button onClick={onRefresh} aria-label="Refresh inbox" className="flex min-h-10 min-w-10 items-center justify-center rounded-full text-[#52635b] hover:bg-[#f0f4f1]">
+        <button onClick={onRefresh} aria-label="Refresh inbox" className="hidden min-h-10 min-w-10 items-center justify-center rounded-full text-[#52635b] hover:bg-[#f0f4f1] md:flex">
           <RefreshCw className="h-4 w-4" />
         </button>
         {selectedIds.size > 0 && (
@@ -157,7 +166,7 @@ export default function EmailList({
       </div>
 
       {folder === "inbox" && (
-        <nav aria-label="Inbox categories" className="grid shrink-0 grid-cols-2 border-b border-[#e3e9e4] sm:grid-cols-4">
+        <nav aria-label="Inbox categories" className="hidden shrink-0 grid-cols-4 border-b border-[#e3e9e4] md:grid">
           {CATEGORIES.map(({ id, label, icon: Icon }) => {
             const active = category === id;
             return (
@@ -182,7 +191,7 @@ export default function EmailList({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {threads.length === 0 ? (
-          <EmptyState folder={folder} category={category} searchMatches={searchMatches} />
+          <EmptyState folder={folder} category={activeCategory} searchMatches={searchMatches} />
         ) : (
           <ul className="divide-y divide-[#e8ede9]">
             {threads.map((thread) => {
@@ -207,19 +216,19 @@ export default function EmailList({
                         onOpen(email);
                       }
                     }}
-                    className={`group grid min-h-[3.75rem] min-w-0 cursor-pointer grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-1 border-l-2 px-2 py-2 transition-colors hover:bg-[#f5f8f5] sm:grid-cols-[2rem_2rem_minmax(8rem,15rem)_minmax(0,1fr)_5.5rem] sm:gap-x-3 sm:px-4 ${
+                    className={`group grid min-h-[3.5rem] min-w-0 cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-x-1 border-l-2 px-1.5 py-2 transition-colors hover:bg-[#f5f8f5] md:min-h-[3.75rem] md:grid-cols-[1.5rem_1.5rem_minmax(8rem,15rem)_minmax(0,1fr)_5.5rem] md:gap-x-2 md:px-3 ${
                       active
                         ? "border-l-[#286653] bg-[#e8f1eb]"
                         : `border-l-transparent ${unread ? "bg-[#f7faf7]" : "bg-white"}`
                     }`}
                   >
-                    <div className="col-start-1 row-span-2 flex items-center justify-start gap-2 sm:contents">
+                    <div className="col-start-1 row-span-2 flex items-center justify-start gap-0 md:contents">
                       <input
+                        className="hidden h-4 w-4 shrink-0 accent-[#286653] md:block md:col-start-1 md:row-start-1"
                         type="checkbox"
                         checked={allSelected}
                         onClick={(event) => event.stopPropagation()}
                         onChange={() => onToggleSelectMany(threadIds)}
-                        className="h-5 w-5 shrink-0 accent-[#286653] sm:col-start-1 sm:row-start-1"
                         aria-label={`Select ${contextMessages.length} message${contextMessages.length === 1 ? "" : "s"}`}
                       />
                       <button
@@ -229,23 +238,23 @@ export default function EmailList({
                           onToggleStar(email.id);
                         }}
                         aria-label={email.starred ? "Unstar" : "Star"}
-                        className="flex min-h-10 min-w-10 items-center justify-center rounded-full hover:bg-[#edf3ef] sm:col-start-2 sm:row-start-1"
+                        className="flex min-h-10 min-w-10 items-center justify-center rounded-full hover:bg-[#edf3ef] md:col-start-2 md:row-start-1"
                       >
                         <Star className={`h-5 w-5 ${email.starred ? "fill-amber-400 text-amber-400" : "text-[#c6d0c9] group-hover:text-[#718078]"}`} />
                       </button>
                     </div>
-                    <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 sm:col-start-3 sm:row-start-1">
+                    <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-2 md:col-start-3 md:row-start-1">
                       <span className={`min-w-0 flex-1 truncate text-sm ${unread ? "font-semibold text-[#24352e]" : "text-[#46564e]"}`}>
                         {senderLabel}
                       </span>
                       {contextMessages.length > 1 && <span className="shrink-0 rounded-full bg-[#e9efeb] px-1.5 py-0.5 text-[11px] font-medium text-[#52635b]">{contextMessages.length}</span>}
-                      <time className="shrink-0 text-[11px] text-[#718078] sm:hidden">{formatTimestamp(email.createdAt)}</time>
+                      <time className="shrink-0 text-[11px] text-[#718078] md:hidden">{formatTimestamp(email.createdAt)}</time>
                     </div>
-                    <div className="col-start-2 row-start-2 min-w-0 truncate sm:col-start-4 sm:row-start-1">
+                    <div className="col-start-2 row-start-2 min-w-0 truncate md:col-start-4 md:row-start-1">
                       <span className={`${unread ? "text-sm font-semibold text-[#24352e]" : "text-sm text-[#52635b]"}`}>{email.subject || "(no subject)"}</span>
                       {email.subject && <span className="ml-2 text-sm text-[#87948d]">{snippet(email.body, 100)}</span>}
                     </div>
-                    <time className="hidden justify-self-end whitespace-nowrap text-xs text-[#718078] sm:col-start-5 sm:row-start-1 sm:block">{formatTimestamp(email.createdAt)}</time>
+                    <time className="hidden justify-self-end whitespace-nowrap text-xs text-[#718078] md:col-start-5 md:row-start-1 md:block">{formatTimestamp(email.createdAt)}</time>
                   </div>
                 </li>
               );

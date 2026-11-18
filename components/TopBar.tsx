@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, Search, Mail, RefreshCw, LogOut } from "lucide-react";
+import { Menu, Search, Mail, RefreshCw, LogOut, UserRound } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { PushNotificationsControl, PwaInstallControl } from "@/components/PwaControls";
 
@@ -13,6 +14,9 @@ interface TopBarProps {
   onGoInbox: () => void;
   userEmail?: string | null;
   userName?: string | null;
+  userCompanyEmail?: string | null;
+  userDepartment?: string | null;
+  userRole?: string | null;
   isStaff?: boolean;
   onSignOut?: () => void;
 }
@@ -25,10 +29,31 @@ export default function TopBar({
   onGoInbox,
   userEmail,
   userName,
+  userCompanyEmail,
+  userDepartment,
+  userRole,
   isStaff,
   onSignOut,
 }: TopBarProps) {
   const avatarName = userName ?? userEmail;
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileOpen]);
 
   return (
     <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b border-[#e3e9e4] bg-white px-2 py-2 md:h-16 md:flex-nowrap md:px-4 md:py-0">
@@ -46,7 +71,7 @@ export default function TopBar({
         className="flex items-center gap-2 px-1 md:px-2"
       >
         <Mail className="h-6 w-6 text-[#286653]" />
-        <span className="hidden text-lg font-semibold tracking-[-0.03em] text-[#24352e] lg:block">
+        <span className="text-base font-semibold tracking-[-0.03em] text-[#24352e] md:text-lg">
           Mailico
         </span>
       </button>
@@ -66,7 +91,7 @@ export default function TopBar({
       <button
         onClick={onRefresh}
         aria-label="Refresh"
-        className="min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1]"
+        className="hidden min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1] md:block"
       >
         <RefreshCw className="h-5 w-5" />
       </button>
@@ -84,15 +109,42 @@ export default function TopBar({
       )}
 
       {userEmail && (
-        <div className="flex items-center gap-2">
-          <Avatar name={avatarName} size="md" className="hidden sm:flex" />
+        <div ref={profileMenuRef} className="relative">
           <button
-            onClick={onSignOut}
-            aria-label="Sign out"
-            className="min-h-11 min-w-11 rounded-full p-2.5 text-[#52635b] hover:bg-[#f0f4f1]"
+            type="button"
+            onClick={() => setProfileOpen((open) => !open)}
+            aria-label="Open profile menu"
+            aria-haspopup="dialog"
+            aria-expanded={profileOpen}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-1 hover:bg-[#f0f4f1]"
           >
-            <LogOut className="h-5 w-5" />
+            <Avatar name={avatarName} size="md" />
           </button>
+          {profileOpen && (
+            <div role="dialog" aria-label="Profile and sign out" className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-[#dfe7e1] bg-white p-4 text-[#24352e] shadow-xl">
+              <div className="flex items-center gap-3 border-b border-[#e8ede9] pb-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e4efe8] text-[#286653]"><UserRound className="size-4" /></span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Profile</p>
+                  <p className="truncate text-xs text-[#718078]">{userName || userEmail}</p>
+                </div>
+              </div>
+              <dl className="space-y-2 py-3 text-xs">
+                <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Login email</dt><dd className="min-w-0 break-all">{userEmail}</dd></div>
+                {userCompanyEmail && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Company email</dt><dd className="min-w-0 break-all">{userCompanyEmail}</dd></div>}
+                {userDepartment && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Department</dt><dd className="min-w-0 break-words">{userDepartment}</dd></div>}
+                {userRole && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Role</dt><dd className="min-w-0 break-words">{userRole}</dd></div>}
+              </dl>
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="flex min-h-10 w-full items-center gap-2 rounded-lg border border-[#e3e9e4] px-3 text-left text-sm font-medium text-[#46564e] hover:bg-[#f5f8f5]"
+              >
+                <LogOut className="size-4" />
+                <span>Log out</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
       </div>
