@@ -16,7 +16,7 @@ export default function HomePage() {
         <header className="landing-nav">
           <Link href="/" className="landing-brand" aria-label="Mailico home"><span className="brand-mark"><Mail size={16} strokeWidth={1.7} /></span>mailico</Link>
           <nav className="landing-menu flex items-center gap-8" aria-label="Main navigation">
-            <Link href="#product">Product</Link><Link href="#how-it-works">How it works</Link><Link href="/pricing">Pricing</Link>
+            <Link href="#product">Product</Link><Link href="#how-it-works">How it works</Link><Link href="/pricing">Pricing</Link><Link href="/docs">API docs</Link>
           </nav>
           <div className="flex items-center gap-3"><Link className="nav-signin" href="/login">Sign in</Link><Link className="button button-dark nav-cta" href="/register">Get started <ArrowRight size={14} /></Link></div>
         </header>
@@ -75,7 +75,7 @@ export default function HomePage() {
 
         <section className="closing-cta"><Reveal><span className="eyebrow">A BETTER HOME FOR BUSINESS EMAIL</span><h2>Make room for<br /><em>good work.</em></h2><p>Set up your company workspace and give your team a clearer way to handle email.</p><Link href="/register" className="button button-dark">Get started with Mailico <ArrowRight size={15}/></Link></Reveal><BotanicalArt className="closing-botanical" /></section>
 
-        <footer className="landing-footer"><Link href="/" className="landing-brand"><span className="brand-mark"><Mail size={15}/></span>mailico</Link><span>Thoughtful email for work.</span><div><Link href="/pricing">Plans</Link><Link href="/manual">Guide</Link><Link href="/login">Sign in</Link></div><small>© {new Date().getFullYear()} Mailico</small></footer>
+        <footer className="landing-footer"><Link href="/" className="landing-brand"><span className="brand-mark"><Mail size={15}/></span>mailico</Link><span>Thoughtful email for work.</span><div><Link href="/pricing">Plans</Link><Link href="/manual">Guide</Link><Link href="/docs">API docs</Link><Link href="/login">Sign in</Link></div><small>© {new Date().getFullYear()} Mailico</small></footer>
       </div>
       <div className="marquee" aria-hidden="true"><div className="marquee-track"><span>Collect <i>✳</i> Read <i>✳</i> Reply <i>✳</i> Keep in touch <i>✳</i>&nbsp;</span><span>Collect <i>✳</i> Read <i>✳</i> Reply <i>✳</i> Keep in touch <i>✳</i>&nbsp;</span></div></div>
     </main>
