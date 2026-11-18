@@ -34,6 +34,7 @@ export default function EmployeeInvitePanel({
   const cancelInvitation = useMutation(api.profiles.cancelEmployeeInvitation);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
   const [assignedLocalPart, setAssignedLocalPart] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -52,11 +53,12 @@ export default function EmployeeInvitePanel({
       const response = await fetch("/api/admin/employee-invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, accountEmail, assignedLocalPart, departmentId, role }),
+        body: JSON.stringify({ name, employeeId, accountEmail, assignedLocalPart, departmentId, role }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "Could not send the employee invitation.");
       setName("");
+      setEmployeeId("");
       setAccountEmail("");
       setAssignedLocalPart("");
       setDepartmentId("");
@@ -110,6 +112,10 @@ export default function EmployeeInvitePanel({
                     <Input id="invite-employee-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
                   </div>
                   <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="invite-employee-id">Employee ID</Label>
+                    <Input id="invite-employee-id" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} maxLength={64} required />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
                     <Label htmlFor="invite-account-email">Primary delivery email</Label>
                     <Input id="invite-account-email" type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} autoComplete="email" required />
                   </div>
@@ -160,8 +166,9 @@ export default function EmployeeInvitePanel({
               <li key={invitation._id} className="flex min-w-0 flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{invitation.name}</p>
+                  <p className="text-xs text-[#718078]">Employee ID: {invitation.employeeId || "Not set"}</p>
                   <p className="break-all text-xs text-muted-foreground">{invitation.accountEmail}</p>
-                  <p className="break-words text-xs text-[#286653]">{invitation.assignedEmail} · {invitation.department?.name ?? "Department removed"} · {invitation.role === "hrLead" ? "HR Lead" : "Employee"}</p>
+                  <p className="break-words text-xs text-[#286653]">{invitation.assignedEmail} · {invitation.department?.name ?? "No department"} · {invitation.role === "hrLead" ? "HR Lead" : "Employee"}</p>
                 </div>
                 <Button type="button" variant="outline" size="sm" className="min-h-9 shrink-0 self-start sm:self-auto" onClick={() => void cancel(invitation._id)}>Cancel invitation</Button>
               </li>

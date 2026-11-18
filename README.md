@@ -23,6 +23,7 @@ A Gmail-style mail client that sends email through [Resend](https://resend.com) 
    RESEND_API_KEY= # add after creating a Resend key
    RESEND_WEBHOOK_SECRET=whsec_xxxxxxxx
    MAILICO_INTERNAL_SECRET=use-a-long-random-secret
+   MAILICO_EMPLOYEE_API_KEY=use-a-separate-long-random-secret
    MAILICO_OWNER_SETUP_TOKEN=use-a-different-random-secret-at-least-32-characters
    ```
 
@@ -66,6 +67,7 @@ NEXT_PUBLIC_APP_NAME=Your product name
 RESEND_API_KEY=...
 RESEND_WEBHOOK_SECRET=...
 MAILICO_INTERNAL_SECRET=...
+MAILICO_EMPLOYEE_API_KEY=...
 MAILICO_OWNER_SETUP_TOKEN=...
 ```
 
@@ -122,6 +124,28 @@ Server-side rules:
 - At least one `to` recipient is required; recipients are basic email validated.
 - Each user can send up to 30 messages per hour; the quota is enforced in Convex across server instances.
 - `replyTo` is set to the sender so replies land back on the custom address.
+
+## Employee provisioning API
+
+`POST /api/employees` creates a pending employee invitation and sends the same password setup email used by the admin invite flow. The employee can then verify their primary email and set a password. The API-created employee starts without a department; an admin can assign one later.
+
+Configure a unique high-entropy `MAILICO_EMPLOYEE_API_KEY` in the Vercel server environment. Keep it private and send it as a bearer token. This key is separate from `MAILICO_INTERNAL_SECRET`.
+
+```http
+Authorization: Bearer <MAILICO_EMPLOYEE_API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Taylor Morgan",
+  "employeeId": "EMP-1042",
+  "primaryEmail": "taylor@example.com",
+  "assignedEmail": "taylor.morgan@mail.example.com"
+}
+```
+
+The `assignedEmail` must use the company domain configured in `/setup`. A successful request returns HTTP `201` with `ok`, the employee data, `invitationStatus: "pending"`, and `emailSent`. Repeating the same request for an active pending invitation returns success without sending another email; changing employee details for that same primary email returns `409`. Invalid input returns `422`, duplicate email/address/employee ID returns `409`, an invalid bearer key returns `401`, missing server configuration returns `503`, and unavailable mail delivery returns `502`.
 
 ## Storage note
 

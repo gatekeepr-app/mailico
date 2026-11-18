@@ -422,6 +422,7 @@ function EmployeeRow({
   const updateProfile = useMutation(api.profiles.updateProfileAssignment);
   const removeEmployee = useMutation(api.profiles.removeEmployee);
   const [role, setRole] = useState<ProfileRole>(profile.role);
+  const [employeeId, setEmployeeId] = useState(profile.employeeId ?? "");
   const [departmentId, setDepartmentId] = useState<string>(profile.departmentId ?? "none");
   const [assignedEmail, setAssignedEmail] = useState(
     profile.assignedEmail?.split("@")[0] ?? "",
@@ -437,6 +438,7 @@ function EmployeeRow({
   function setDialogOpen(open: boolean) {
     if (open) {
       setRole(profile.role);
+      setEmployeeId(profile.employeeId ?? "");
       setDepartmentId(profile.departmentId ?? "none");
       setAssignedEmail(profile.assignedEmail?.split("@")[0] ?? "");
     }
@@ -450,6 +452,7 @@ function EmployeeRow({
       await updateProfile({
         profileId: profile._id,
         role,
+        employeeId,
         departmentId: departmentId === "none" ? undefined : departmentId as Id<"departments">,
         assignedEmail: assignedEmail.trim() || undefined,
       });
@@ -510,6 +513,7 @@ function EmployeeRow({
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[#24352e] sm:text-sm">{profile.name}</p>
             <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{profile.accountEmail}</p>
+            <p className="truncate text-[10px] text-[#718078] sm:text-xs">ID: {profile.employeeId || "Not set"}</p>
             <p className="mt-0.5 truncate text-[10px] text-[#718078] sm:text-xs">{roleLabel}{department ? ` · ${department.name}` : ""}</p>
           </div>
         </div>
@@ -532,6 +536,10 @@ function EmployeeRow({
                   <DialogDescription>Update {profile.name}’s role, department, and company email address.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor={`employee-id-${profile._id}`}>Employee ID</Label>
+                    <Input id={`employee-id-${profile._id}`} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} maxLength={64} />
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor={`employee-role-${profile._id}`}>Role</Label>
                     <Select value={role} onValueChange={(value) => setRole(value as ProfileRole)} disabled={roleLocked}>

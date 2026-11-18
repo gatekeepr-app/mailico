@@ -35,6 +35,8 @@ export default defineSchema({
     accountEmail: v.string(),
     accountEmailNormalized: v.optional(v.string()),
     name: v.string(),
+    employeeId: v.optional(v.string()),
+    employeeIdNormalized: v.optional(v.string()),
     role: v.union(
       v.literal("admin"),
       v.literal("chief"),
@@ -50,6 +52,7 @@ export default defineSchema({
   })
     .index("by_auth_user", ["authUserId"])
     .index("by_account_email_normalized", ["accountEmailNormalized"])
+    .index("by_employee_id", ["employeeIdNormalized"])
     .index("by_assigned_email", ["assignedEmail"])
     .index("by_updatedAt", ["updatedAt"])
     .index("by_department", ["departmentId"]),
@@ -128,7 +131,9 @@ export default defineSchema({
     accountEmail: v.string(),
     accountEmailNormalized: v.string(),
     assignedEmail: v.string(),
-    departmentId: v.id("departments"),
+    employeeId: v.optional(v.string()),
+    employeeIdNormalized: v.optional(v.string()),
+    departmentId: v.optional(v.id("departments")),
     role: v.union(v.literal("user"), v.literal("hrLead")),
     invitedByAuthUserId: v.string(),
     tokenHash: v.string(),
@@ -140,6 +145,7 @@ export default defineSchema({
   })
     .index("by_email_status", ["accountEmailNormalized", "status"])
     .index("by_assigned_email_status", ["assignedEmail", "status"])
+    .index("by_employee_id_status", ["employeeIdNormalized", "status"])
     .index("by_tokenHash", ["tokenHash"])
     .index("by_department_status", ["departmentId", "status"]),
 

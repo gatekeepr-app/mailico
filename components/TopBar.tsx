@@ -15,6 +15,7 @@ interface TopBarProps {
   userEmail?: string | null;
   userName?: string | null;
   userCompanyEmail?: string | null;
+  userEmployeeId?: string | null;
   userDepartment?: string | null;
   userRole?: string | null;
   isStaff?: boolean;
@@ -30,6 +31,7 @@ export default function TopBar({
   userEmail,
   userName,
   userCompanyEmail,
+  userEmployeeId,
   userDepartment,
   userRole,
   isStaff,
@@ -132,6 +134,7 @@ export default function TopBar({
               <dl className="space-y-2 py-3 text-xs">
                 <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Login email</dt><dd className="min-w-0 break-all">{userEmail}</dd></div>
                 {userCompanyEmail && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Company email</dt><dd className="min-w-0 break-all">{userCompanyEmail}</dd></div>}
+                {userEmployeeId && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Employee ID</dt><dd className="min-w-0 break-all">{userEmployeeId}</dd></div>}
                 {userDepartment && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Department</dt><dd className="min-w-0 break-words">{userDepartment}</dd></div>}
                 {userRole && <div className="flex gap-2"><dt className="w-24 shrink-0 text-[#87948d]">Role</dt><dd className="min-w-0 break-words">{userRole}</dd></div>}
               </dl>

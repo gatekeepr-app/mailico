@@ -506,6 +506,7 @@ export default function MailApp() {
         userEmail={userEmail}
         userName={userName}
         userCompanyEmail={profileData?.profile?.assignedEmail ?? null}
+        userEmployeeId={profileData?.profile?.employeeId ?? null}
         userDepartment={profileData?.department?.name ?? null}
         userRole={profileData?.profile?.role === "hrLead"
           ? (profileData?.department?.headTitle ?? "Department head")

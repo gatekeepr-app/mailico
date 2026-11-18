@@ -104,7 +104,9 @@ export default function EmployeeInvitationPage() {
               ? `An account already exists for ${primaryEmail || invitation?.accountEmail}. Sign in with that account to accept the company invitation.`
               : verificationSent
               ? `We sent a verification link to ${verificationEmail}. Verify that address before signing in.`
-              : "Accept your administrator’s invitation, choose your personal or primary email for account recovery, create a password, and verify that address. Your department HR Lead can review messages sent from department accounts."}
+              : invitation?.department
+                ? "Accept your administrator’s invitation, choose your personal or primary email for account recovery, create a password, and verify that address. Your department HR Lead can review messages sent from department accounts."
+                : "Accept your administrator’s invitation, choose your personal or primary email for account recovery, create a password, and verify that address. Your department can be assigned later."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -118,7 +120,8 @@ export default function EmployeeInvitationPage() {
           ) : existingAccount ? (
             <div className="space-y-3 border border-[#d9ddd6] bg-[#fbfbf8] p-4 text-sm">
               <p><span className="font-medium">Company address:</span> {invitation.assignedEmail}</p>
-              <p><span className="font-medium">Department:</span> {invitation.department}</p>
+              <p><span className="font-medium">Employee ID:</span> {invitation.employeeId}</p>
+              {invitation.department && <p><span className="font-medium">Department:</span> {invitation.department}</p>}
               <p className="text-muted-foreground">After signing in, Mailico will attach this address and department to your account. If your email is not verified yet, sign-in will send a verification link.</p>
               <Button asChild className="min-h-11 w-full rounded-none bg-[#286653] text-white hover:bg-[#1f5544]">
                 <Link href="/login">Sign in to accept invitation</Link>
@@ -127,7 +130,8 @@ export default function EmployeeInvitationPage() {
           ) : verificationSent ? (
             <div className="space-y-3 border border-[#d9ddd6] bg-[#fbfbf8] p-4 text-sm">
               <p><span className="font-medium">Company address:</span> {invitation.assignedEmail}</p>
-              <p><span className="font-medium">Department:</span> {invitation.department}</p>
+              <p><span className="font-medium">Employee ID:</span> {invitation.employeeId}</p>
+              {invitation.department && <p><span className="font-medium">Department:</span> {invitation.department}</p>}
               <p className="text-muted-foreground">The verification link expires according to the email instructions. After verification, your account can sign in to Mailico.</p>
               <Button asChild variant="outline" className="min-h-11 w-full rounded-none">
                 <Link href={`/verify-email?email=${encodeURIComponent(verificationEmail || invitation.accountEmail)}`}>Resend verification email</Link>
@@ -137,9 +141,10 @@ export default function EmployeeInvitationPage() {
             <div className="space-y-5">
               <div className="border border-[#d9ddd6] bg-[#fbfbf8] p-4 text-sm">
                 <p className="font-medium">{invitation.name}</p>
+                <p className="text-xs text-muted-foreground">Employee ID: {invitation.employeeId}</p>
                 <p className="break-all text-muted-foreground">Invitation sent to: {invitation.accountEmail}</p>
                 <p className="mt-2 font-medium text-[#286653]">{invitation.assignedEmail}</p>
-                <p className="text-xs text-muted-foreground">{invitation.department} · {invitation.role === "hrLead" ? "Department HR Lead" : "Employee"}</p>
+                <p className="text-xs text-muted-foreground">{invitation.department ? `${invitation.department} · ` : "No department assigned · "}{invitation.role === "hrLead" ? "Department HR Lead" : "Employee"}</p>
               </div>
               <form onSubmit={accept} className="space-y-4">
                 <div className="space-y-2">

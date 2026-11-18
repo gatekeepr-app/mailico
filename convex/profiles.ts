@@ -3,6 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 const ADMIN_PAGE_ROLES = new Set(["admin", "chief", "hrLead", "hr"]);
 
@@ -39,6 +40,119 @@ function normalizeAssignedEmail(localOrEmail: string, mailDomain: string) {
     throw new ConvexError(`Assigned addresses must use @${mailDomain}.`);
   }
   return `${normalizeLocalPart(value)}@${mailDomain}`;
+}
+
+function normalizeEmployeeId(value: string) {
+  const employeeId = value.trim();
+  if (!employeeId || employeeId.length > 64 || /[\u0000-\u001f\u007f]/.test(employeeId)) {
+    throw new ConvexError("Enter an employee ID between 1 and 64 characters.");
+  }
+  return { employeeId, employeeIdNormalized: employeeId.toLowerCase() };
+}
+
+type EmployeeInvitationInput = {
+  name: string;
+  employeeId: string;
+  accountEmail: string;
+  assignedEmail: string;
+  departmentId?: Id<"departments">;
+  role: "user" | "hrLead";
+  tokenHash: string;
+  invitedByAuthUserId: string;
+};
+
+async function createEmployeeInvitationRecord(ctx: MutationCtx, args: EmployeeInvitationInput) {
+  const settings = await getCompanySettings(ctx);
+  if (!settings) throw new ConvexError("Complete company setup before inviting employees.");
+  const name = args.name.trim();
+  const accountEmail = args.accountEmail.trim().toLowerCase();
+  if (name.length < 2 || name.length > 120) throw new ConvexError("Enter the employee's name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail) || accountEmail.length > 320) {
+    throw new ConvexError("Enter a valid real email address.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(args.tokenHash)) throw new ConvexError("Invalid invitation token.");
+  const employee = normalizeEmployeeId(args.employeeId);
+  const department = args.departmentId ? await ctx.db.get(args.departmentId) : null;
+  if (args.departmentId && !department) throw new ConvexError("Choose an existing department.");
+  if (args.role === "hrLead" && !department) throw new ConvexError("An HR Lead must be assigned to a department.");
+  const assignedEmail = normalizeAssignedEmail(args.assignedEmail, settings.domain);
+  const existingProfile = await ctx.db.query("userProfiles")
+    .withIndex("by_account_email_normalized", (q) => q.eq("accountEmailNormalized", accountEmail))
+    .unique();
+  if (existingProfile && !existingProfile.deactivatedAt) throw new ConvexError("An account already exists for this real email.");
+  if (existingProfile && existingProfile.assignedEmail !== assignedEmail) {
+    throw new ConvexError("Reinstated employees must keep their existing company email address to preserve mailbox history.");
+  }
+  const profileByEmployeeId = await ctx.db.query("userProfiles")
+    .withIndex("by_employee_id", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized))
+    .unique();
+  if (profileByEmployeeId && profileByEmployeeId._id !== existingProfile?._id) {
+    throw new ConvexError("That employee ID is already in use.");
+  }
+  const assignedProfile = await ctx.db.query("userProfiles")
+    .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", assignedEmail))
+    .unique();
+  if (assignedProfile && assignedProfile._id !== existingProfile?._id) throw new ConvexError("That company email is already assigned.");
+
+  const now = Date.now();
+  const existingInvite = await ctx.db.query("employeeInvitations")
+    .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", accountEmail).eq("status", "pending"))
+    .first();
+  const assignedInvite = await ctx.db.query("employeeInvitations")
+    .withIndex("by_assigned_email_status", (q) => q.eq("assignedEmail", assignedEmail).eq("status", "pending"))
+    .filter((q) => q.gt(q.field("expiresAt"), now))
+    .first();
+  if (assignedInvite && assignedInvite._id !== existingInvite?._id) {
+    throw new ConvexError("That company email is already reserved by another invitation.");
+  }
+  const invitationByEmployeeId = await ctx.db.query("employeeInvitations")
+    .withIndex("by_employee_id_status", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized).eq("status", "pending"))
+    .filter((q) => q.gt(q.field("expiresAt"), now))
+    .first();
+  if (invitationByEmployeeId && invitationByEmployeeId._id !== existingInvite?._id) {
+    throw new ConvexError("That employee ID is already reserved by another invitation.");
+  }
+
+  if (args.role === "hrLead" && args.departmentId) {
+    const pendingInvites = await ctx.db.query("employeeInvitations")
+      .withIndex("by_department_status", (q) => q.eq("departmentId", args.departmentId).eq("status", "pending"))
+      .filter((q) => q.gt(q.field("expiresAt"), now))
+      .take(200);
+    if (pendingInvites.some((invite) => invite.role === "hrLead" && invite._id !== existingInvite?._id)) {
+      throw new ConvexError("This department already has an HR Lead invitation pending.");
+    }
+  } else if (args.departmentId) {
+    const departmentProfiles = await ctx.db.query("userProfiles")
+      .withIndex("by_department", (q) => q.eq("departmentId", args.departmentId))
+      .take(200);
+    const pendingInvites = await ctx.db.query("employeeInvitations")
+      .withIndex("by_department_status", (q) => q.eq("departmentId", args.departmentId).eq("status", "pending"))
+      .filter((q) => q.gt(q.field("expiresAt"), now))
+      .take(200);
+    const activeLead = departmentProfiles.some((profile) => !profile.deactivatedAt && profile.role === "hrLead");
+    const pendingLead = pendingInvites.some((invite) => invite.role === "hrLead" && invite._id !== existingInvite?._id);
+    if (!activeLead && !pendingLead) throw new ConvexError("Invite this department’s HR Lead before adding employees to it.");
+  }
+
+  const invitationData = {
+    name,
+    ...employee,
+    accountEmail,
+    accountEmailNormalized: accountEmail,
+    assignedEmail,
+    departmentId: args.departmentId,
+    role: args.role,
+    invitedByAuthUserId: args.invitedByAuthUserId,
+    tokenHash: args.tokenHash,
+    status: "pending" as const,
+    expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+    updatedAt: now,
+  };
+  if (existingInvite) {
+    await ctx.db.patch(existingInvite._id, invitationData);
+    return existingInvite._id;
+  }
+  return await ctx.db.insert("employeeInvitations", { ...invitationData, createdAt: now });
 }
 
 function canAccessAdminPage(_email: string, role: string | undefined) {
@@ -119,6 +233,8 @@ export const ensureCurrentProfile = mutation({
           accountEmail: user.email,
           accountEmailNormalized: user.email.toLowerCase(),
           name: invitation.name,
+          employeeId: invitation.employeeId,
+          employeeIdNormalized: invitation.employeeIdNormalized,
           role: invitation.role,
           departmentId: invitation.departmentId,
           assignedEmail: invitation.assignedEmail,
@@ -169,6 +285,8 @@ export const ensureCurrentProfile = mutation({
       accountEmail: user.email,
       accountEmailNormalized: emailNormalized,
       name: invitation?.name || user.name || user.email.split("@")[0],
+      employeeId: invitation?.employeeId,
+      employeeIdNormalized: invitation?.employeeIdNormalized,
       role,
       departmentId: invitation?.departmentId,
       assignedEmail: invitation?.assignedEmail,
@@ -214,14 +332,15 @@ export const getEmployeeInvitation = query({
       .withIndex("by_tokenHash", (q) => q.eq("tokenHash", args.tokenHash))
       .unique();
     if (!invitation || invitation.status !== "pending" || invitation.expiresAt <= Date.now()) return null;
-    const department = await ctx.db.get(invitation.departmentId);
+    const department = invitation.departmentId ? await ctx.db.get(invitation.departmentId) : null;
     const settings = await getCompanySettings(ctx);
-    if (!department || !settings) return null;
+    if (!settings) return null;
     return {
       name: invitation.name,
+      employeeId: invitation.employeeId,
       accountEmail: invitation.accountEmail,
       assignedEmail: invitation.assignedEmail,
-      department: department.name,
+      department: department?.name ?? null,
       role: invitation.role,
       companyDomain: settings.domain,
       expiresAt: invitation.expiresAt,
@@ -279,7 +398,7 @@ export const listEmployeeInvitations = query({
       .take(200);
     return await Promise.all(invitations.map(async ({ tokenHash: _tokenHash, ...invitation }) => ({
       ...invitation,
-      department: await ctx.db.get(invitation.departmentId),
+      department: invitation.departmentId ? await ctx.db.get(invitation.departmentId) : null,
     })));
   },
 });
@@ -287,6 +406,7 @@ export const listEmployeeInvitations = query({
 export const createEmployeeInvitation = mutation({
   args: {
     name: v.string(),
+    employeeId: v.string(),
     accountEmail: v.string(),
     assignedLocalPart: v.string(),
     departmentId: v.id("departments"),
@@ -308,6 +428,7 @@ export const createEmployeeInvitation = mutation({
     if (!/^[a-f0-9]{64}$/.test(args.tokenHash)) throw new ConvexError("Invalid invitation token.");
     const department = await ctx.db.get(args.departmentId);
     if (!department) throw new ConvexError("Choose an existing department.");
+    const employee = normalizeEmployeeId(args.employeeId);
     const assignedEmail = normalizeAssignedEmail(args.assignedLocalPart, settings.domain);
     const emailNormalized = accountEmail;
     const existingProfile = await ctx.db.query("userProfiles")
@@ -316,6 +437,12 @@ export const createEmployeeInvitation = mutation({
     if (existingProfile && !existingProfile.deactivatedAt) throw new ConvexError("An account already exists for this real email.");
     if (existingProfile && existingProfile.assignedEmail !== assignedEmail) {
       throw new ConvexError("Reinstated employees must keep their existing company email address to preserve mailbox history.");
+    }
+    const profileByEmployeeId = await ctx.db.query("userProfiles")
+      .withIndex("by_employee_id", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized))
+      .unique();
+    if (profileByEmployeeId && profileByEmployeeId._id !== existingProfile?._id) {
+      throw new ConvexError("That employee ID is already in use.");
     }
     const assignedProfile = await ctx.db.query("userProfiles")
       .withIndex("by_assigned_email", (q) => q.eq("assignedEmail", assignedEmail))
@@ -332,6 +459,13 @@ export const createEmployeeInvitation = mutation({
       .first();
     if (assignedInvite && assignedInvite._id !== existingInvite?._id) {
       throw new ConvexError("That company email is already reserved by another invitation.");
+    }
+    const invitationByEmployeeId = await ctx.db.query("employeeInvitations")
+      .withIndex("by_employee_id_status", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized).eq("status", "pending"))
+      .filter((q) => q.gt(q.field("expiresAt"), now))
+      .first();
+    if (invitationByEmployeeId && invitationByEmployeeId._id !== existingInvite?._id) {
+      throw new ConvexError("That employee ID is already reserved by another invitation.");
     }
 
     if (args.role === "hrLead") {
@@ -360,6 +494,7 @@ export const createEmployeeInvitation = mutation({
 
     const invitationData = {
       name,
+      ...employee,
       accountEmail,
       accountEmailNormalized: emailNormalized,
       assignedEmail,
@@ -376,6 +511,54 @@ export const createEmployeeInvitation = mutation({
       return existingInvite._id;
     }
     return await ctx.db.insert("employeeInvitations", { ...invitationData, createdAt: now });
+  },
+});
+
+export const createExternalEmployeeInvitationInternal = internalMutation({
+  args: {
+    name: v.string(),
+    employeeId: v.string(),
+    accountEmail: v.string(),
+    assignedEmail: v.string(),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const settings = await getCompanySettings(ctx);
+    if (!settings) throw new ConvexError("Complete company setup before inviting employees.");
+    const assignedEmail = normalizeAssignedEmail(args.assignedEmail, settings.domain);
+    const name = args.name.trim();
+    const accountEmailNormalized = args.accountEmail.trim().toLowerCase();
+    const employee = normalizeEmployeeId(args.employeeId);
+    const existingInvite = await ctx.db.query("employeeInvitations")
+      .withIndex("by_email_status", (q) => q.eq("accountEmailNormalized", accountEmailNormalized).eq("status", "pending"))
+      .first();
+    if (existingInvite && existingInvite.expiresAt > Date.now()) {
+      const sameInvitation = existingInvite.name === name &&
+        existingInvite.employeeIdNormalized === employee.employeeIdNormalized &&
+        existingInvite.assignedEmail === assignedEmail;
+      if (!sameInvitation) throw new ConvexError("An active invitation already exists for this primary email with different employee details.");
+      return { invitationId: existingInvite._id, assignedEmail, domain: settings.domain, alreadyPending: true };
+    }
+    const invitationId = await createEmployeeInvitationRecord(ctx, {
+      ...args,
+      name,
+      accountEmail: accountEmailNormalized,
+      assignedEmail,
+      ...employee,
+      role: "user",
+      invitedByAuthUserId: settings.ownerAuthUserId,
+    });
+    return { invitationId, assignedEmail, domain: settings.domain, alreadyPending: false };
+  },
+});
+
+export const cancelExternalEmployeeInvitationInternal = internalMutation({
+  args: { invitationId: v.id("employeeInvitations") },
+  handler: async (ctx, args) => {
+    const invitation = await ctx.db.get(args.invitationId);
+    if (invitation?.status === "pending") {
+      await ctx.db.patch(invitation._id, { status: "cancelled", updatedAt: Date.now() });
+    }
   },
 });
 
@@ -816,6 +999,7 @@ export const createDepartment = mutation({
 export const updateProfileAssignment = mutation({
   args: {
     profileId: v.id("userProfiles"),
+    employeeId: v.string(),
     role: v.union(
       v.literal("admin"),
       v.literal("chief"),
@@ -831,6 +1015,20 @@ export const updateProfileAssignment = mutation({
     const target = await ctx.db.get(args.profileId);
     if (!target) throw new ConvexError("User profile not found.");
     if (target.deactivatedAt) throw new ConvexError("This employee no longer has workspace access.");
+    const employee = args.employeeId.trim() ? normalizeEmployeeId(args.employeeId) : undefined;
+    if (employee) {
+      const existingEmployeeId = await ctx.db.query("userProfiles")
+        .withIndex("by_employee_id", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized))
+        .unique();
+      if (existingEmployeeId && existingEmployeeId._id !== target._id) throw new ConvexError("That employee ID is already in use.");
+      const pendingInvite = await ctx.db.query("employeeInvitations")
+        .withIndex("by_employee_id_status", (q) => q.eq("employeeIdNormalized", employee.employeeIdNormalized).eq("status", "pending"))
+        .filter((q) => q.gt(q.field("expiresAt"), Date.now()))
+        .first();
+      if (pendingInvite && pendingInvite.accountEmailNormalized !== target.accountEmailNormalized) {
+        throw new ConvexError("That employee ID is already reserved by another invitation.");
+      }
+    }
     const settings = await getCompanySettings(ctx);
     const targetIsAdminAccount = Boolean(settings && settings.ownerAuthUserId === target.authUserId);
     const actorIsAdmin = Boolean(settings && settings.ownerAuthUserId === user._id);
@@ -914,6 +1112,8 @@ export const updateProfileAssignment = mutation({
     }
 
     await ctx.db.patch(args.profileId, {
+      employeeId: employee?.employeeId,
+      employeeIdNormalized: employee?.employeeIdNormalized,
       role: args.role,
       departmentId: args.departmentId,
       assignedEmail,

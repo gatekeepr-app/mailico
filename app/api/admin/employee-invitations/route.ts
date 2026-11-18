@@ -1,18 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Resend } from "resend";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { fetchAuthMutation, fetchAuthQuery } from "@/lib/auth-server";
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
+import { sendEmployeeInvitationEmail } from "@/lib/employee-invitations";
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -41,6 +31,7 @@ export async function POST(request: Request) {
   const data = payload as Record<string, unknown>;
   if (
     typeof data.name !== "string" || data.name.length > 120 ||
+    typeof data.employeeId !== "string" || data.employeeId.length > 64 ||
     typeof data.accountEmail !== "string" || data.accountEmail.length > 320 ||
     typeof data.assignedLocalPart !== "string" || data.assignedLocalPart.length > 320 ||
     typeof data.departmentId !== "string" || data.departmentId.length > 128 ||
@@ -50,9 +41,10 @@ export async function POST(request: Request) {
   }
 
   const name = data.name.trim();
+  const employeeId = data.employeeId.trim();
   const accountEmail = data.accountEmail.trim().toLowerCase();
-  if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail)) {
-    return Response.json({ error: "Enter a valid employee name and real email address." }, { status: 400 });
+  if (name.length < 2 || !employeeId || /[\u0000-\u001f\u007f]/.test(employeeId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail)) {
+    return Response.json({ error: "Enter a valid employee name, employee ID, and real email address." }, { status: 400 });
   }
 
   let profileData;
@@ -71,6 +63,7 @@ export async function POST(request: Request) {
   try {
     invitationId = await fetchAuthMutation(api.profiles.createEmployeeInvitation, {
       name,
+      employeeId,
       accountEmail,
       assignedLocalPart: data.assignedLocalPart,
       departmentId: data.departmentId as Id<"departments">,
@@ -84,20 +77,17 @@ export async function POST(request: Request) {
   }
 
   const invitationUrl = new URL(`/invite/${token}`, request.url).toString();
-  const safeName = escapeHtml(name);
-  const safeAssignedEmail = escapeHtml(data.assignedLocalPart.trim().toLowerCase() + "@" + profileData.companySettings.domain);
-  const safeUrl = escapeHtml(invitationUrl);
-  const resend = new Resend(apiKey);
   let sendError: unknown = null;
   try {
-    const result = await resend.emails.send({
-      from: `Mailico <auth@${profileData.companySettings.domain}>`,
-      to: [accountEmail],
-      subject: "You’re invited to your company Mailico account",
-      html: `<p>Hi ${safeName},</p><p>Your administrator invited you to use <strong>${safeAssignedEmail}</strong> for company email.</p><p>Open the invitation to choose your personal or primary email, create a password, and verify that email. It will be used for account recovery.</p><p>Your department HR Lead can review messages sent from department accounts.</p><p><a href="${safeUrl}">Accept invitation</a></p><p>This invitation expires in seven days. If you were not expecting it, you can ignore this email.</p>`,
-      text: `Hi ${name},\n\nYour administrator invited you to use ${data.assignedLocalPart.trim().toLowerCase()}@${profileData.companySettings.domain} for company email. Open this link to choose your personal or primary email, create a password, and verify that email. It will be used for account recovery. Your department HR Lead can review messages sent from department accounts.\n\n${invitationUrl}\n\nThis invitation expires in seven days. If you were not expecting it, you can ignore this email.`,
+    await sendEmployeeInvitationEmail({
+      apiKey,
+      name,
+      accountEmail,
+      assignedEmail: data.assignedLocalPart.trim().toLowerCase() + "@" + profileData.companySettings.domain,
+      domain: profileData.companySettings.domain,
+      invitationUrl,
+      departmentMessage: "Your department HR Lead can review messages sent from department accounts.",
     });
-    sendError = result.error;
   } catch (error) {
     sendError = error;
   }
